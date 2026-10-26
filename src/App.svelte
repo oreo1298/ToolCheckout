@@ -6,10 +6,12 @@
   import UnlockDialog from './lib/flows/UnlockDialog.svelte';
   import Settings from './lib/screens/Settings.svelte';
   import Setup from './lib/screens/Setup.svelte';
+  import Tools from './lib/screens/Tools.svelte';
+  import ToolDetail from './lib/tools/ToolDetail.svelte';
 
   const nav: { id: Screen; label: string; icon: string; tech?: boolean }[] = [
     { id: 'home', label: 'Home', icon: 'home' },
-    { id: 'tools', label: 'Tools', icon: 'tool' },
+    { id: 'tools', label: 'Tools', icon: 'tool', tech: true },
     { id: 'borrowers', label: 'Borrowers', icon: 'users', tech: true },
     { id: 'incidents', label: 'Incidents', icon: 'alert', tech: true },
     { id: 'reports', label: 'Reports', icon: 'chart', tech: true },
@@ -86,6 +88,8 @@
     <main class="content">
       {#if app.screen === 'settings'}
         <Settings />
+      {:else if app.screen === 'tools'}
+        <Tools />
       {:else}
         <h1>{nav.find((n) => n.id === app.screen)?.label}</h1>
         <p class="muted">Coming up in the next milestones.</p>
@@ -94,6 +98,11 @@
   </div>
 {/if}
 
+{#if app.toolDetailId !== null && app.session}
+  {#key app.toolDetailId}
+    <ToolDetail id={app.toolDetailId} onclose={() => (app.toolDetailId = null)} />
+  {/key}
+{/if}
 {#if app.unlockRequest}
   <UnlockDialog reason={app.unlockRequest.reason} />
 {/if}

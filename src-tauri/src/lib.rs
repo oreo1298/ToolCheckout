@@ -47,6 +47,19 @@ pub fn run() {
             commands::update_settings,
             commands::verify_audit,
             commands::audit_log,
+            commands::list_tools,
+            commands::tool_row,
+            commands::tool_categories,
+            commands::tool_detail,
+            commands::create_tool,
+            commands::update_tool,
+            commands::update_tool_condition,
+            commands::send_tool_to_repair,
+            commands::tool_back_from_repair,
+            commands::retire_tool,
+            commands::reinstate_tool,
+            commands::save_photo,
+            commands::get_photo,
         ])
         .setup(move |app| {
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())

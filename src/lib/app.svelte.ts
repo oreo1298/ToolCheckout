@@ -29,6 +29,8 @@ class AppStore {
   /** Ticks every second for countdowns and "how long" labels. */
   nowMs = $state(Date.now());
   unlockRequest = $state<UnlockRequest | null>(null);
+  /** Tool whose detail panel is open (from any screen). */
+  toolDetailId = $state<number | null>(null);
   /** True from a not-set-up start until the recovery code is acknowledged. */
   onboarding = $state(false);
   toasts = $state<Toast[]>([]);

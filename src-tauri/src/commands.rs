@@ -178,3 +178,127 @@ pub fn verify_audit(state: State<'_, AppState>) -> CmdResult<VerifyReport> {
 pub fn audit_log(state: State<'_, AppState>, query: AuditQuery) -> CmdResult<Vec<AuditRow>> {
     read(&state, |s| s.audit_log(&query))
 }
+
+// ---------------------------------------------------------------- tools
+
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as B64;
+use toolcheckout_core::model::Condition;
+use toolcheckout_core::tools::{Tool, ToolDetail, ToolFilter, ToolInput, ToolRow};
+
+#[tauri::command(async)]
+pub fn list_tools(state: State<'_, AppState>, filter: ToolFilter) -> CmdResult<Vec<ToolRow>> {
+    read(&state, |s| s.list_tools(&filter))
+}
+
+#[tauri::command(async)]
+pub fn tool_row(state: State<'_, AppState>, id: i64) -> CmdResult<ToolRow> {
+    read(&state, |s| s.tool_row(id))
+}
+
+#[tauri::command(async)]
+pub fn tool_categories(state: State<'_, AppState>) -> CmdResult<Vec<String>> {
+    read(&state, |s| s.tool_categories())
+}
+
+#[tauri::command(async)]
+pub fn tool_detail(state: State<'_, AppState>, id: i64) -> CmdResult<ToolDetail> {
+    read(&state, |s| s.tool_detail(id))
+}
+
+#[tauri::command(async)]
+pub fn create_tool(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: ToolInput,
+) -> CmdResult<Tool> {
+    write(&app, &state, |s| s.create_tool(input))
+}
+
+#[tauri::command(async)]
+pub fn update_tool(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    input: ToolInput,
+) -> CmdResult<Tool> {
+    write(&app, &state, |s| s.update_tool(id, input))
+}
+
+#[tauri::command(async)]
+pub fn update_tool_condition(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    condition: Condition,
+    notes: String,
+    photo_id: Option<i64>,
+    reason: String,
+) -> CmdResult<Tool> {
+    write(&app, &state, |s| {
+        s.update_tool_condition(id, condition, &notes, photo_id, &reason)
+    })
+}
+
+#[tauri::command(async)]
+pub fn send_tool_to_repair(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    note: String,
+) -> CmdResult<Tool> {
+    write(&app, &state, |s| s.send_tool_to_repair(id, &note))
+}
+
+#[tauri::command(async)]
+pub fn tool_back_from_repair(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    condition: Condition,
+    notes: String,
+    photo_id: Option<i64>,
+) -> CmdResult<Tool> {
+    write(&app, &state, |s| {
+        s.tool_back_from_repair(id, condition, &notes, photo_id)
+    })
+}
+
+#[tauri::command(async)]
+pub fn retire_tool(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    reason: String,
+) -> CmdResult<Tool> {
+    write(&app, &state, |s| s.retire_tool(id, &reason))
+}
+
+#[tauri::command(async)]
+pub fn reinstate_tool(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    condition: Condition,
+    notes: String,
+) -> CmdResult<Tool> {
+    write(&app, &state, |s| s.reinstate_tool(id, condition, &notes))
+}
+
+// ---------------------------------------------------------------- photos
+
+/// Accepts a `data:image/...;base64,` URL (or bare base64) from the UI.
+#[tauri::command(async)]
+pub fn save_photo(state: State<'_, AppState>, data: String) -> CmdResult<i64> {
+    let b64 = data.split_once(',').map_or(data.as_str(), |(_, b)| b);
+    let bytes = B64
+        .decode(b64.trim())
+        .map_err(|_| CoreError::Invalid("That photo couldn't be read".into()))?;
+    read(&state, |s| s.save_photo(&bytes))
+}
+
+#[tauri::command(async)]
+pub fn get_photo(state: State<'_, AppState>, id: i64) -> CmdResult<String> {
+    let (mime, bytes) = read(&state, |s| s.photo(id))?;
+    Ok(format!("data:{mime};base64,{}", B64.encode(bytes)))
+}

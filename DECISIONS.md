@@ -118,3 +118,29 @@ at the bottom of each group.
   identifier-named folder, which is less discoverable).
 * If the database can't be opened, the app shows the reason instead of
   crashing (e.g. a custom folder on a disconnected drive).
+
+## Tools
+
+* **The Tools menu is technician-only** (as specified). Borrowers never need
+  it: the home screen's search and the checkout/return pickers use a separate
+  read-only list command.
+* **Asset tags** are sequential (`T-0001`…), assigned by the backend, and never
+  reused, even after a tool is retired. Lookup ignores case and dashes, so a
+  scanner on a different keyboard layout that mangles `-` still finds the tool.
+* **Condition only changes through dedicated actions** that carry context:
+  added (initial), "Update condition" (reason required), return/inspection,
+  back from repair, reinstate, found. Editing a tool can't touch condition or
+  status. Manual updates are allowed only while the tool is on the shelf or
+  out for repair; a tool on loan gets its condition at return inspection.
+* **Back from repair / reinstate** refuse Damaged/Broken: such a tool should
+  stay in repair or be retired, not go back on the shelf.
+* **Duplicate** opens the Add form pre-filled from the source tool, minus
+  serial number and condition (they belong to the physical item), so the tech
+  must choose the new tool's condition.
+* **Photos** are stored in the database as immutable BLOBs (one-file backups;
+  evidence can't be swapped). The UI re-encodes uploads to JPEG ≤ 1280 px
+  (~25–150 KB); the backend sniffs the bytes and only accepts JPEG/PNG/WebP,
+  4 MB max.
+* **Status changes use compare-and-set** (`… WHERE status = <expected>`), so two
+  windows (or two Windows accounts sharing the data folder) can't both act on
+  the same stale tool.

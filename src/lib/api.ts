@@ -118,6 +118,80 @@ export interface AuditQuery {
   limit?: number;
 }
 
+export type Condition = 'new' | 'good' | 'fair' | 'worn' | 'damaged' | 'broken';
+export type ToolStatus = 'available' | 'checked_out' | 'awaiting_inspection' | 'out_for_repair' | 'lost' | 'retired';
+export type ConditionSource = 'initial' | 'manual' | 'return_inspection' | 'inspection' | 'repair' | 'found';
+
+export interface Tool {
+  id: number;
+  assetTag: string;
+  name: string;
+  category: string;
+  description: string;
+  serial: string;
+  model: string;
+  photoId: number | null;
+  replacementCostCents: number | null;
+  homeLocation: string;
+  defaultLoanMinutes: number;
+  techOnly: boolean;
+  condition: Condition;
+  conditionNotes: string;
+  status: ToolStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ToolRow extends Tool {
+  checkoutId: number | null;
+  borrowerId: number | null;
+  borrowerName: string | null;
+  checkedOutAt: number | null;
+  dueAt: number | null;
+}
+
+export interface ToolInput {
+  name: string;
+  category: string;
+  description: string;
+  serial: string;
+  model: string;
+  photoId: number | null;
+  replacementCostCents: number | null;
+  homeLocation: string;
+  defaultLoanMinutes: number;
+  techOnly: boolean;
+  condition: Condition | null;
+  conditionNotes: string;
+}
+
+export interface ToolFilter {
+  search?: string;
+  status?: ToolStatus;
+  category?: string;
+  includeRetired?: boolean;
+  limit?: number;
+  id?: number;
+}
+
+export interface ConditionEvent {
+  id: number;
+  toolId: number;
+  condition: Condition;
+  notes: string;
+  photoId: number | null;
+  reason: string;
+  source: ConditionSource;
+  checkoutId: number | null;
+  techName: string | null;
+  createdAt: number;
+}
+
+export interface ToolDetail {
+  row: ToolRow;
+  conditions: ConditionEvent[];
+}
+
 // ------------------------------------------------------------------ commands
 
 export const api = {
@@ -143,4 +217,22 @@ export const api = {
   updateSettings: (settings: Settings) => call<Settings>('update_settings', { settings }),
   verifyAudit: () => call<VerifyReport>('verify_audit'),
   auditLog: (query: AuditQuery) => call<AuditRow[]>('audit_log', { query }),
+
+  listTools: (filter: ToolFilter = {}) => call<ToolRow[]>('list_tools', { filter }),
+  toolRow: (id: number) => call<ToolRow>('tool_row', { id }),
+  toolCategories: () => call<string[]>('tool_categories'),
+  toolDetail: (id: number) => call<ToolDetail>('tool_detail', { id }),
+  createTool: (input: ToolInput) => call<Tool>('create_tool', { input }),
+  updateTool: (id: number, input: ToolInput) => call<Tool>('update_tool', { id, input }),
+  updateToolCondition: (id: number, condition: Condition, notes: string, photoId: number | null, reason: string) =>
+    call<Tool>('update_tool_condition', { id, condition, notes, photoId, reason }),
+  sendToolToRepair: (id: number, note: string) => call<Tool>('send_tool_to_repair', { id, note }),
+  toolBackFromRepair: (id: number, condition: Condition, notes: string, photoId: number | null) =>
+    call<Tool>('tool_back_from_repair', { id, condition, notes, photoId }),
+  retireTool: (id: number, reason: string) => call<Tool>('retire_tool', { id, reason }),
+  reinstateTool: (id: number, condition: Condition, notes: string) =>
+    call<Tool>('reinstate_tool', { id, condition, notes }),
+
+  savePhoto: (data: string) => call<number>('save_photo', { data }),
+  getPhoto: (id: number) => call<string>('get_photo', { id }),
 };

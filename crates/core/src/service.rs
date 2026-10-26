@@ -103,6 +103,16 @@ impl Service {
         Ok(out)
     }
 
+    /// Runs `f` in one transaction as the unlocked technician (or fails with
+    /// `TechRequired` before touching anything).
+    pub(crate) fn tech_tx<T>(
+        &mut self,
+        f: impl FnOnce(&Transaction<'_>, i64, &Actor) -> Result<T>,
+    ) -> Result<T> {
+        let actor = self.require_tech()?;
+        self.tx(|tx, now| f(tx, now, &actor))
+    }
+
     /// The unlocked technician as an actor (refreshing the inactivity timer),
     /// or `TechRequired`.
     pub(crate) fn require_tech(&mut self) -> Result<Actor> {

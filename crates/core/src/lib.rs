@@ -10,12 +10,14 @@ pub mod db;
 pub mod error;
 pub mod model;
 pub mod paths;
+pub mod photos;
 pub mod pin;
 pub mod service;
 pub mod session;
 pub mod settings;
 pub mod status;
 pub mod technicians;
+pub mod tools;
 
 pub use clock::{Clock, ManualClock, SystemClock};
 pub use error::{CoreError, Result};
