@@ -3,6 +3,7 @@
 //! background jobs.
 
 mod appearance;
+mod backup_job;
 mod commands;
 mod reminders;
 mod state;
@@ -87,6 +88,18 @@ pub fn run() {
             commands::report_loans,
             commands::report_incidents,
             commands::export_report_csv,
+            commands::backup_status,
+            commands::backup_now,
+            commands::save_backup_as,
+            commands::pick_backup_file,
+            commands::restore_backup,
+            commands::verify_against_backups,
+            commands::pick_folder,
+            commands::inspect_data_folder,
+            commands::relocate_data,
+            commands::retry_open,
+            commands::enter_demo,
+            commands::exit_demo,
         ])
         .setup(move |app| {
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
@@ -100,6 +113,7 @@ pub fn run() {
             win.build()?;
             appearance::start(app.handle().clone());
             reminders::start(app.handle().clone());
+            backup_job::start(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

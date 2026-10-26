@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { api } from './lib/api';
   import { app, type Screen } from './lib/app.svelte';
   import Icon from './lib/components/Icon.svelte';
   import Toasts from './lib/components/Toasts.svelte';
@@ -30,6 +31,26 @@
     app.screen = item.id;
   }
 
+  // Recovering from "can't open its data" (e.g. a shared folder's drive was
+  // missing at startup).
+  async function retry() {
+    try {
+      await api.retryOpen();
+    } catch {
+      // The screen shows the new reason.
+    }
+    await app.reload();
+  }
+
+  async function useDefault() {
+    try {
+      await api.relocateData(null, false);
+    } catch {
+      // As above.
+    }
+    await app.reload();
+  }
+
   const remaining = $derived(app.session ? app.session.expiresAt - app.nowMs : 0);
 </script>
 
@@ -41,9 +62,15 @@
       <h1>ToolCheckout can't open its data</h1>
       <p>{app.boot.startupError}</p>
       <p class="muted">
-        Check that the folder exists and you can write to it. If you moved the data folder in Settings, make sure the
-        drive or network share is connected, then restart ToolCheckout.
+        Check that the folder exists and you can write to it. If the data is in a shared folder on another drive, make
+        sure the drive is connected, then try again.
       </p>
+      <div class="row wrap">
+        <button class="btn btn-primary" onclick={retry}>Try again</button>
+        {#if app.boot.location?.mode === 'custom'}
+          <button class="btn" onclick={useDefault}>Use this account's own data folder instead</button>
+        {/if}
+      </div>
     </div>
   </div>
 {:else if app.onboarding || !app.status?.setUp}

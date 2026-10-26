@@ -12,7 +12,7 @@ use toolcheckout_core::settings::Settings;
 use toolcheckout_core::technicians::Technician;
 use toolcheckout_core::{CoreError, Service};
 
-use crate::state::AppState;
+use crate::state::{AppState, Inner};
 
 pub type CmdResult<T> = Result<T, CoreError>;
 
@@ -571,4 +571,260 @@ pub fn export_report_csv(
     }
     std::fs::write(&path, csv)?;
     Ok(Some(path.display().to_string()))
+}
+
+// ---------------------------------------------------------------- backups
+
+use std::path::PathBuf;
+use toolcheckout_core::backup::{BackupCheck, BackupInfo, BackupStatus};
+use toolcheckout_core::paths;
+
+fn picked(p: Option<tauri_plugin_dialog::FilePath>) -> CmdResult<Option<PathBuf>> {
+    p.map(|f| {
+        f.into_path()
+            .map_err(|e| CoreError::Invalid(format!("Can't use that location: {e}")))
+    })
+    .transpose()
+}
+
+#[tauri::command(async)]
+pub fn backup_status(state: State<'_, AppState>) -> CmdResult<BackupStatus> {
+    read(&state, |s| s.backup_status())
+}
+
+/// Manual backup into the backup folder (never pruned).
+#[tauri::command(async)]
+pub fn backup_now(app: AppHandle, state: State<'_, AppState>) -> CmdResult<String> {
+    write(&app, &state, |s| {
+        let dest = s.backup_dir().join(s.default_backup_name());
+        s.backup_to(&dest)?;
+        Ok(dest.display().to_string())
+    })
+}
+
+/// Manual backup to a file the technician chooses (e.g. a USB stick).
+#[tauri::command(async)]
+pub fn save_backup_as(app: AppHandle, state: State<'_, AppState>) -> CmdResult<Option<String>> {
+    let name = read(&state, |s| {
+        s.ensure_tech()?; // before showing a dialog
+        Ok(s.default_backup_name())
+    })?;
+    let Some(dest) = picked(
+        app.dialog()
+            .file()
+            .set_title("Save a ToolCheckout backup")
+            .set_file_name(&name)
+            .add_filter("ToolCheckout backup", &["db"])
+            .blocking_save_file(),
+    )?
+    else {
+        return Ok(None);
+    };
+    write(&app, &state, |s| s.backup_to(&dest))?;
+    Ok(Some(dest.display().to_string()))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PickedBackup {
+    pub path: String,
+    pub info: BackupInfo,
+}
+
+/// Step 1 of restore: choose a file and look inside it.
+#[tauri::command(async)]
+pub fn pick_backup_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> CmdResult<Option<PickedBackup>> {
+    let dir = read(&state, |s| {
+        s.ensure_tech()?;
+        Ok(s.backup_dir())
+    })?;
+    let Some(path) = picked(
+        app.dialog()
+            .file()
+            .set_title("Choose a backup to restore")
+            .set_directory(dir)
+            .add_filter("ToolCheckout backup", &["db"])
+            .blocking_pick_file(),
+    )?
+    else {
+        return Ok(None);
+    };
+    let info = read(&state, |s| s.inspect_backup(&path))?;
+    Ok(Some(PickedBackup {
+        path: path.display().to_string(),
+        info,
+    }))
+}
+
+/// Step 2 of restore, after the technician confirmed.
+#[tauri::command(async)]
+pub fn restore_backup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: String,
+) -> CmdResult<String> {
+    write(&app, &state, |s| s.restore_from(&PathBuf::from(path))).map(|p| p.display().to_string())
+}
+
+#[tauri::command(async)]
+pub fn verify_against_backups(state: State<'_, AppState>) -> CmdResult<Vec<BackupCheck>> {
+    read(&state, |s| s.verify_against_backups())
+}
+
+#[tauri::command(async)]
+pub fn pick_folder(app: AppHandle, title: String) -> CmdResult<Option<String>> {
+    Ok(
+        picked(app.dialog().file().set_title(&title).blocking_pick_folder())?
+            .map(|p| p.display().to_string()),
+    )
+}
+
+// ---------------------------------------------------------------- data folder
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderInfo {
+    pub path: String,
+    pub existing: Option<BackupInfo>,
+    pub writable: bool,
+}
+
+/// Changing which data this PC uses needs a technician of the current data,
+/// unless there's nothing to protect yet: it isn't set up, or it couldn't be
+/// opened (e.g. a shared folder on a missing drive). Never from the demo.
+fn guard_data_change(g: &mut Inner) -> CmdResult<()> {
+    let Some(svc) = g.svc.as_mut() else {
+        return Ok(());
+    };
+    if svc.is_demo()? {
+        return Err(CoreError::Conflict("Leave the demo first".into()));
+    }
+    if svc.is_set_up()? {
+        svc.ensure_tech()?;
+    }
+    Ok(())
+}
+
+/// What's in a folder we might move the data to.
+#[tauri::command(async)]
+pub fn inspect_data_folder(state: State<'_, AppState>, path: String) -> CmdResult<FolderInfo> {
+    guard_data_change(&mut state.lock())?;
+    let dir = PathBuf::from(&path);
+    if !dir.is_absolute() {
+        return Err(CoreError::Invalid("Choose a full folder path".into()));
+    }
+    let db = dir.join(paths::DB_FILE);
+    let existing = if db.exists() {
+        Some(toolcheckout_core::backup::inspect(&db)?)
+    } else {
+        None
+    };
+    let probe = dir.join(".toolcheckout-write-test");
+    let writable = std::fs::create_dir_all(&dir).is_ok() && std::fs::write(&probe, b"ok").is_ok();
+    let _ = std::fs::remove_file(probe);
+    Ok(FolderInfo {
+        path,
+        existing,
+        writable,
+    })
+}
+
+/// Moves (copies) the data to `path`, or switches to the data already there,
+/// then remembers the folder and reopens. `path = None` goes back to the
+/// default per-user folder.
+#[tauri::command(async)]
+pub fn relocate_data(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: Option<String>,
+    copy: bool,
+) -> CmdResult<DataLocation> {
+    let mut g = state.lock();
+    let loc = g.location()?;
+    if matches!(
+        loc.mode,
+        paths::LocationMode::Portable | paths::LocationMode::Environment
+    ) {
+        return Err(CoreError::Conflict(
+            "The data folder is fixed in this mode (portable build or TOOLCHECKOUT_DATA_DIR)"
+                .into(),
+        ));
+    }
+    let target = path
+        .map(PathBuf::from)
+        .unwrap_or_else(|| loc.default_dir.clone());
+    if target == loc.dir {
+        return Ok(loc);
+    }
+    guard_data_change(&mut g)?;
+    if copy {
+        let svc = g.svc.as_mut().ok_or(CoreError::NotSetUp)?;
+        svc.copy_database_to(&target, paths::DB_FILE)?;
+    } else if target != loc.default_dir && !target.join(paths::DB_FILE).exists() {
+        return Err(CoreError::Invalid(format!(
+            "There is no ToolCheckout data in {}",
+            target.display()
+        )));
+    }
+    let custom = (target != loc.default_dir).then_some(target.as_path());
+    paths::write_pointer(&loc.default_dir, custom)?;
+    let new_loc = paths::resolve(None, None, &loc.default_dir);
+    g.reopen(new_loc.clone())?;
+    drop(g);
+    let _ = app.emit(DATA_CHANGED, ());
+    Ok(new_loc)
+}
+
+/// Tries to open the data again, e.g. after the drive holding a shared data
+/// folder was reconnected.
+#[tauri::command(async)]
+pub fn retry_open(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    let loc = crate::state::resolve_location().map_err(CoreError::Invalid)?;
+    state.lock().reopen(loc)?;
+    let _ = app.emit(DATA_CHANGED, ());
+    Ok(())
+}
+
+// ---------------------------------------------------------------- demo
+
+#[tauri::command(async)]
+pub fn enter_demo(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    let mut g = state.lock();
+    if let Some(svc) = g.svc.as_mut()
+        && svc.is_set_up()?
+        && !svc.is_demo()?
+    {
+        svc.ensure_tech()?; // leaving real data for the demo needs a technician
+    }
+    let loc = g.location()?;
+    std::fs::create_dir_all(&loc.dir)?;
+    g.svc = None;
+    toolcheckout_core::demo::create(&loc.demo_db_path(), chrono::Utc::now().timestamp_millis())?;
+    std::fs::write(
+        loc.demo_marker(),
+        "Demo mode: ToolCheckout is showing sample data.\n",
+    )?;
+    g.reopen(loc)?;
+    drop(g);
+    let _ = app.emit(DATA_CHANGED, ());
+    Ok(())
+}
+
+/// Leaves demo mode: deletes the demo database and reopens the real data.
+#[tauri::command(async)]
+pub fn exit_demo(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    let mut g = state.lock();
+    let loc = g.location()?;
+    g.svc = None;
+    let _ = std::fs::remove_file(loc.demo_marker());
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", loc.demo_db_path().display()));
+    }
+    g.reopen(loc)?;
+    drop(g);
+    let _ = app.emit(DATA_CHANGED, ());
+    Ok(())
 }

@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { api, type AuditRow, type VerifyReport } from '../api';
+  import { api, type AuditRow, type BackupCheck, type VerifyReport } from '../api';
   import { app } from '../app.svelte';
   import Icon from '../components/Icon.svelte';
   import { dateTime } from '../format';
   import { auditDiff, auditLabel } from '../labels';
 
   let report = $state<VerifyReport | null>(null);
+  let backups = $state<BackupCheck[]>([]);
   let verifying = $state(false);
   let rows = $state<AuditRow[]>([]);
   let more = $state(true);
@@ -29,6 +30,7 @@
     verifying = true;
     try {
       report = (await app.withTech(() => api.verifyAudit())) ?? null;
+      backups = report ? await api.verifyAgainstBackups() : [];
     } catch (e) {
       app.error(e);
     } finally {
@@ -69,6 +71,18 @@
           for investigation.
         </div>
       </div>
+    {/if}
+    {#each backups as b (b.name)}
+      <div class="result {b.problem ? 'bad' : 'ok'}" role="status">
+        <Icon name={b.problem ? 'alert' : 'check'} />
+        <div>
+          {#if b.problem}<strong>Doesn't match backup {b.name}:</strong> {b.problem}.
+          {:else}Consistent with backup <span class="mono">{b.name}</span>.{/if}
+        </div>
+      </div>
+    {/each}
+    {#if report && !backups.length}
+      <p class="faint small">No backups to compare with yet. Comparing with older backups also catches a log that was rewritten from scratch.</p>
     {/if}
   {/if}
 

@@ -5,10 +5,12 @@
 //! reports all live here so they are unit-tested and can't be bypassed.
 
 pub mod audit;
+pub mod backup;
 pub mod borrowers;
 pub mod clock;
 pub mod csv;
 pub mod db;
+pub mod demo;
 pub mod error;
 pub mod incidents;
 pub mod loans;

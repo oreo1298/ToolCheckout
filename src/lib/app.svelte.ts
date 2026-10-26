@@ -85,6 +85,7 @@ class AppStore {
     this.status = s;
     this.session = s.session;
     this.clockOffset = s.now - Date.now();
+    this.nowMs = this.now();
     theme.setOverride(s.settings.theme);
   }
 
@@ -94,6 +95,17 @@ class AppStore {
     } catch {
       /* startup error already shown */
     }
+  }
+
+  /** After switching databases (demo, restore, new data folder). */
+  async reload() {
+    this.boot = await api.bootstrap();
+    if (this.boot.status) this.applyStatus(this.boot.status);
+    this.session = this.boot.status?.session ?? null;
+    this.flow = null;
+    this.toolDetailId = null;
+    this.screen = 'home';
+    this.dataVersion++;
   }
 
   private tick() {
@@ -159,7 +171,14 @@ class AppStore {
   }
 
   error(e: unknown) {
-    this.toast(asApiError(e).message, 'error');
+    const err = asApiError(e);
+    // A background refresh found tech mode locked (timed out, or ended by a
+    // restore): show the lock screen instead of an error.
+    if (err.code === 'tech_required') {
+      this.session = null;
+      return;
+    }
+    this.toast(err.message, 'error');
   }
 
   dismissToast(id: number) {

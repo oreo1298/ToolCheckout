@@ -2,6 +2,7 @@
   import { api, type Technician } from '../api';
   import { app } from '../app.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import ConfirmDialog from '../components/ConfirmDialog.svelte';
   import Icon from '../components/Icon.svelte';
   import Modal from '../components/Modal.svelte';
   import PinCreate from '../components/PinCreate.svelte';
@@ -12,6 +13,7 @@
   let pinFor = $state<Technician | null>(null);
   let addStep = $state<'name' | 'pin'>('name');
   let newCode = $state<string | null>(null);
+  let askRegenerate = $state(false);
 
   $effect(() => {
     void app.dataVersion;
@@ -49,7 +51,7 @@
   }
 
   async function regenerate() {
-    if (!confirm('Make a new recovery code? The old one stops working immediately.')) return;
+    askRegenerate = false;
     try {
       const code = await app.withTech(() => api.regenerateRecoveryCode());
       if (code) newCode = code;
@@ -90,7 +92,7 @@
     <p class="muted grow">
       The recovery code resets a forgotten technician PIN. Make a new one if it may have been seen by someone else.
     </p>
-    <button class="btn" onclick={regenerate}><Icon name="refresh" /> New recovery code</button>
+    <button class="btn" onclick={() => (askRegenerate = true)}><Icon name="refresh" /> New recovery code</button>
   </div>
 </section>
 
@@ -120,6 +122,12 @@
   <Modal title="Change PIN — {pinFor.name}" size="sm" onclose={() => (pinFor = null)}>
     <PinCreate min={4} max={8} label="New PIN" hint="6 digits recommended" onchosen={resetPin} />
   </Modal>
+{/if}
+
+{#if askRegenerate}
+  <ConfirmDialog title="Make a new recovery code?" confirmLabel="Make new code" onconfirm={regenerate} onclose={() => (askRegenerate = false)}>
+    <p>The old code stops working immediately. Write the new one down and keep it somewhere safe.</p>
+  </ConfirmDialog>
 {/if}
 
 {#if newCode}

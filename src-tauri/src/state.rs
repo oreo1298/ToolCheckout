@@ -56,6 +56,36 @@ impl AppState {
     }
 }
 
+impl Inner {
+    /// Closes the current database and opens the one `loc` points at
+    /// (switching demo/real data or after moving the data folder).
+    pub fn reopen(&mut self, loc: DataLocation) -> Result<()> {
+        self.svc = None; // close first so files can be replaced
+        match open_service(&loc) {
+            Ok(svc) => {
+                self.svc = Some(svc);
+                self.startup_error = None;
+                self.location = Some(loc);
+                Ok(())
+            }
+            Err(e) => {
+                self.startup_error = Some(format!(
+                    "Could not open the ToolCheckout data in {}: {e}",
+                    loc.dir.display()
+                ));
+                self.location = Some(loc);
+                Err(e)
+            }
+        }
+    }
+
+    pub fn location(&self) -> Result<DataLocation> {
+        self.location
+            .clone()
+            .ok_or_else(|| CoreError::Invalid("The data folder is unknown".into()))
+    }
+}
+
 /// Opens the demo database while demo mode is on, otherwise the real one.
 pub fn open_service(loc: &DataLocation) -> Result<Service> {
     std::fs::create_dir_all(&loc.dir)?;

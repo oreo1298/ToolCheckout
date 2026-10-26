@@ -403,6 +403,43 @@ export interface ToolSummary {
   problemReports: number;
 }
 
+export interface BackupFile {
+  path: string;
+  name: string;
+  size: number;
+  modified: number;
+  automatic: boolean;
+}
+
+export interface BackupStatus {
+  dir: string;
+  lastAutoBackup: number | null;
+  files: BackupFile[];
+}
+
+export interface BackupInfo {
+  schemaVersion: number;
+  tools: number;
+  borrowers: number;
+  checkouts: number;
+  lastActivity: number | null;
+  shopName: string;
+  auditOk: boolean;
+  auditEntries: number;
+  demo: boolean;
+}
+
+export interface BackupCheck {
+  name: string;
+  problem: string | null;
+}
+
+export interface FolderInfo {
+  path: string;
+  existing: BackupInfo | null;
+  writable: boolean;
+}
+
 export type ReportKind = 'borrowers' | 'tools' | 'loans' | 'incidents' | 'open_incidents';
 
 // ------------------------------------------------------------------ commands
@@ -485,6 +522,19 @@ export const api = {
     call<Incident[]>('report_incidents', { filter, openOnly }),
   exportReportCsv: (kind: ReportKind, filter: ReportFilter, fileName: string) =>
     call<string | null>('export_report_csv', { kind, filter, fileName }),
+
+  backupStatus: () => call<BackupStatus>('backup_status'),
+  backupNow: () => call<string>('backup_now'),
+  saveBackupAs: () => call<string | null>('save_backup_as'),
+  pickBackupFile: () => call<{ path: string; info: BackupInfo } | null>('pick_backup_file'),
+  restoreBackup: (path: string) => call<string>('restore_backup', { path }),
+  verifyAgainstBackups: () => call<BackupCheck[]>('verify_against_backups'),
+  pickFolder: (title: string) => call<string | null>('pick_folder', { title }),
+  inspectDataFolder: (path: string) => call<FolderInfo>('inspect_data_folder', { path }),
+  relocateData: (path: string | null, copy: boolean) => call<DataLocation>('relocate_data', { path, copy }),
+  retryOpen: () => call<void>('retry_open'),
+  enterDemo: () => call<void>('enter_demo'),
+  exitDemo: () => call<void>('exit_demo'),
 
   savePhoto: (data: string) => call<number>('save_photo', { data }),
   getPhoto: (id: number) => call<string>('get_photo', { id }),

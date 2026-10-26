@@ -127,6 +127,12 @@ impl Service {
         })
     }
 
+    /// Fails with `TechRequired` unless a technician is unlocked (for shell
+    /// commands that must check before showing a dialog).
+    pub fn ensure_tech(&mut self) -> Result<()> {
+        self.require_tech().map(|_| ())
+    }
+
     // ------------------------------------------------------------ status
 
     pub fn is_set_up(&self) -> Result<bool> {

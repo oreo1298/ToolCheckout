@@ -240,3 +240,84 @@ at the bottom of each group.
   position calibration (mm), defaulting to −6.35 mm on Linux and 0 on Windows
   (WebView2 honours `@page`). The page box is sized to end just past the last
   label so uneven engine margins can't push out a blank page.
+
+## Backups, data folder, demo
+
+* **Backups are single-file snapshots made with `VACUUM INTO`**, which is
+  consistent while the app is running and includes photos (they live in the
+  database). A snapshot is written to a temporary name and renamed, so a
+  half-written file never looks like a backup.
+* **Automatic backups**: once per local calendar day (checked a minute after
+  start, then every 30 minutes), named `toolcheckout-auto-<stamp>.db`, in
+  `<data folder>/backups` unless Settings names another folder. Only the
+  newest N automatic backups are kept (default 30). Manual backups
+  (`toolcheckout-backup-…`) and pre-restore safety copies are never pruned.
+* **Restore** (tech PIN) first inspects the file: SQLite integrity check, it
+  is a ToolCheckout database, not from a newer app version, not demo data,
+  and its own audit chain verifies. A backup whose chain is broken is
+  refused (the dialog shows why). The current data is saved as
+  `toolcheckout-before-restore-<stamp>.db` before SQLite's online backup API
+  copies the backup in; migrations then run in case the backup is from an
+  older version. Restore is audited and ends tech mode, because the restored
+  data can have different technicians and PINs.
+* **Backups double as tamper evidence**: "Verify log integrity" also checks
+  that the live audit chain extends the chain stored in the newest three
+  backups. A log rewritten from scratch passes the chain check but fails this
+  one. The README tells shops to send backups to a folder or drive the
+  counter PC's users can't edit.
+* **Moving the data folder** (Settings → Data & backups, tech PIN): the
+  chosen folder is checked for write access and for existing ToolCheckout
+  data. Empty folder → the database is copied there (audited before the copy,
+  so the record travels with the data) and used from then on; the old copy is
+  left in place as a fallback. Folder with data → the app switches to it
+  without copying. The choice is stored in `data-location.json` in the
+  default per-user folder, so each Windows account points at the shared
+  folder once. "Back to default folder" removes the pointer. Moving is
+  disabled in portable mode and when `TOOLCHECKOUT_DATA_DIR` is set.
+* **Who may switch folders:** a technician of the current data, except when
+  there is nothing to protect yet: a fresh account's first-run screen offers
+  "Use its shared folder" (switch only, no copy), and the "can't open its
+  data" screen offers Try again / use this account's own folder. Switching
+  never deletes or overwrites data, so this can't be used to destroy
+  anything; someone who switches away still needs a technician PIN for the
+  shared data once they switch back.
+* **Shared folder caveats**: SQLite (WAL, 5 s busy timeout) handles two
+  accounts with the app open at the same time on one PC. Network drives are
+  not supported (SQLite locking over SMB is unreliable); the README says so.
+  Whether a second Windows account can write files the first one created
+  depends on the folder's permissions; the writability check runs when each
+  account picks the folder. This was verified on Linux only.
+* **Demo mode** uses a separate database (`toolcheckout-demo.db`) and a
+  `demo-mode` marker file next to the real one; the real database is never
+  opened or touched while the demo is on. The sample data is generated
+  through the normal business logic on a simulated clock (two weeks of
+  history, an overdue loan, drop-offs, a problem report, damage and lost
+  incidents), so its audit log is genuine and verifies. The demo is marked by
+  a "DEMO DATA" badge and a banner with the demo PINs. Backups, restore and
+  data-folder moves are off in demo mode. "Leave demo" deletes the demo files.
+  Entering the demo needs a tech PIN once real data exists; from the first-run
+  screen it doesn't.
+* **In-app confirmations** replace `window.confirm()`, which looks different
+  in each webview, isn't touch-sized, and returned immediately without asking
+  under WebKitGTK during testing.
+* **Background refreshes that hit "technician PIN required"** (tech mode
+  timed out, or a restore ended it) just switch the UI to locked instead of
+  showing an error.
+
+## Testing notes
+
+* Core: unit tests for every rule the brief lists (status transitions,
+  condition downgrade → incident, overdue, PIN hashing and lockout, audit
+  chain and verification, migrations) plus backups, restore, demo generation,
+  reminders, reports and CSV. They run on Linux and Windows in CI.
+* Frontend: Vitest + Testing Library for pure helpers (scan buffer, format,
+  label layout) and smoke tests that render the whole app against a mocked
+  backend (`@tauri-apps/api/mocks`): first-run setup, the home screen, the
+  demo banner, and the tech-gated screens. One of them caught a real bug
+  (relative times were computed from a stale clock until the first tick).
+* Manual end-to-end runs of the app (debug build and the AppImage) under
+  Xvfb with real GNOME and KDE portals covered first run, tools, photos,
+  borrowers, scan-to-checkout, drop-off, inspection with damage, incidents,
+  reports, CSV, label printing to PDF, notifications, backup, restore, moving
+  the data folder, portable mode and demo mode. Windows behaviour is covered
+  by CI builds and tests only.

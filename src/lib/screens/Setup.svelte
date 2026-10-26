@@ -1,13 +1,60 @@
 <script lang="ts">
   // First run: shop name + first technician + PIN, then the one-time
   // recovery code.
-  import { api } from '../api';
+  import { api, type FolderInfo } from '../api';
   import { app } from '../app.svelte';
+  import ConfirmDialog from '../components/ConfirmDialog.svelte';
   import Icon from '../components/Icon.svelte';
   import PinCreate from '../components/PinCreate.svelte';
   import RecoveryCode from '../components/RecoveryCode.svelte';
+  import { count } from '../format';
 
-  let { ondemo }: { ondemo?: () => void } = $props();
+  let demoBusy = $state(false);
+  async function ondemo() {
+    demoBusy = true;
+    try {
+      await api.enterDemo();
+      await app.reload();
+      app.onboarding = false;
+      app.toast('Demo data loaded — have a look around!');
+    } catch (e) {
+      app.error(e);
+    } finally {
+      demoBusy = false;
+    }
+  }
+
+  // Another account on this PC already keeps its data in a shared folder.
+  const canShare = $derived(!['portable', 'environment'].includes(app.boot?.location?.mode ?? ''));
+  let shared = $state<FolderInfo | null>(null);
+  async function pickShared() {
+    try {
+      const dir = await api.pickFolder('Choose the shared ToolCheckout data folder');
+      if (!dir) return;
+      const info = await api.inspectDataFolder(dir);
+      if (!info.existing) {
+        app.toast("There's no ToolCheckout data in that folder. Choose the folder the other account uses.", 'error');
+      } else if (!info.writable) {
+        app.toast("This account can't write to that folder. Check the folder's permissions.", 'error');
+      } else {
+        shared = info;
+      }
+    } catch (e) {
+      app.error(e);
+    }
+  }
+  async function useShared() {
+    const path = shared!.path;
+    shared = null;
+    try {
+      await api.relocateData(path, false);
+      await app.reload();
+      app.onboarding = false;
+      app.toast(`Using the shared data in ${path}`);
+    } catch (e) {
+      app.error(e);
+    }
+  }
 
   let step = $state<'names' | 'pin' | 'code'>('names');
   let shopName = $state('');
@@ -71,9 +118,12 @@
         </p>
         {#if error}<p class="error-text">{error}</p>{/if}
         <button class="btn btn-primary btn-lg">Next</button>
-        {#if ondemo}
-          <button type="button" class="btn btn-ghost" onclick={ondemo}>
-            <Icon name="box" /> Just looking? Try the demo with sample tools and people
+        <button type="button" class="btn btn-ghost" onclick={ondemo} disabled={demoBusy}>
+          <Icon name="box" /> {demoBusy ? 'Loading demo…' : 'Just looking? Try the demo with sample tools and people'}
+        </button>
+        {#if canShare}
+          <button type="button" class="btn btn-ghost" onclick={pickShared}>
+            <Icon name="database" /> Already set up in another account? Use its shared folder
           </button>
         {/if}
       </form>
@@ -93,7 +143,28 @@
   </div>
 </div>
 
+{#if shared?.existing}
+  <ConfirmDialog title="Use this shared data?" confirmLabel="Use this data" onconfirm={useShared} onclose={() => (shared = null)}>
+    <div class="stack">
+      <code class="path">{shared.path}</code>
+      <p>
+        It holds <strong>{shared.existing.shopName}</strong> ({count(shared.existing.tools, 'tool')},
+        {count(shared.existing.borrowers, 'borrower')}). This account will use it from now on, and technicians unlock with
+        the PINs they already have.
+      </p>
+    </div>
+  </ConfirmDialog>
+{/if}
+
 <style>
+  .path {
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    word-break: break-all;
+  }
   .setup {
     min-height: 100%;
     display: grid;

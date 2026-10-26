@@ -6,7 +6,7 @@
   import Icon from '../components/Icon.svelte';
   import Photo from '../components/Photo.svelte';
   import { STATUSES } from '../domain';
-  import { duration, when } from '../format';
+  import { count, duration, when } from '../format';
   import { listenForScans } from '../scan';
 
   let home = $state<Home | null>(null);
@@ -129,6 +129,19 @@
 </script>
 
 <div class="home">
+  {#if app.status?.demo}
+    <div class="demo" role="note">
+      <Icon name="box" />
+      <span class="grow">
+        <strong>Demo data.</strong> Technician PIN <code>123456</code> · borrower PINs <code>1234</code> · badges
+        <code>DEMO-01</code>…<code>DEMO-06</code> · tool tags <code>T-0001</code>…<code>T-0015</code>. Type a tag and press
+        Enter to “scan” it.
+      </span>
+      <button class="btn btn-sm" onclick={() => app.withTech(async () => (app.screen = 'settings'), 'Leave or reset the demo in Settings.')}>
+        Leave demo…
+      </button>
+    </div>
+  {/if}
   <div class="actions">
     <button class="big checkout" onclick={() => (app.flow = { kind: 'checkout', tools: [], borrower: null })}>
       <Icon name="out" size={34} />
@@ -250,7 +263,7 @@
     </div>
 
     <p class="foot faint">
-      {home.availableTools} tools available
+      {count(home.availableTools, 'tool')} available
       {#if home.openIncidents}· <button class="link" onclick={() => app.withTech(async () => (app.screen = 'incidents'))}>{home.openIncidents} open incident{home.openIncidents === 1 ? '' : 's'}</button>{/if}
     </p>
   {/if}
@@ -352,6 +365,23 @@
   }
   .hits button:hover {
     background: var(--surface-2);
+  }
+  .demo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 1rem;
+    border-radius: var(--radius-lg);
+    border: 1px dashed var(--warning);
+    background: var(--warning-soft);
+    flex-wrap: wrap;
+  }
+  .demo > span {
+    flex: 1 1 320px;
+  }
+  .demo code {
+    font-family: var(--mono);
+    font-weight: 700;
   }
   .eod {
     display: flex;

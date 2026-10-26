@@ -93,6 +93,11 @@ export function hue(name: string): number {
   return h % 360;
 }
 
+/** "1 tool", "3 tools". */
+export function count(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
 /** Loan period in minutes → "4 hours", "1 day", "90 minutes". */
 export function loanPeriod(minutes: number): string {
   if (minutes % (60 * 24) === 0) {
