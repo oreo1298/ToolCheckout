@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  test-linux:
+    name: Test (Linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libxdo-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Frontend type-check
+        run: npm run check
+      - name: Frontend tests
+        run: npm test
+      - name: Frontend build (embedded by the Rust build)
+        run: npm run build
+      - name: rustfmt
+        run: cargo fmt --all --check
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Rust tests
+        run: cargo test --workspace
+
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows
+      - name: Core tests
+        run: cargo test -p toolcheckout-core
+
+  build-linux:
+    name: Build (Linux AppImage + deb)
+    needs: test-linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libxdo-dev patchelf file
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-release
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build bundles
+        run: npx tauri build --bundles appimage,deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ToolCheckout-linux-appimage
+          path: target/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ToolCheckout-linux-deb
+          path: target/release/bundle/deb/*.deb
+          if-no-files-found: error
+
+  build-windows:
+    name: Build (Windows installer + portable)
+    needs: test-windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-release
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build per-user NSIS installer
+        run: npx tauri build --bundles nsis
+      - name: Verify the installer never asks for elevation
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          # NSIS embeds the requested execution level in the PE manifest.
+          $bytes = [System.IO.File]::ReadAllBytes($setup.FullName)
+          $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+          if ($text -match 'requireAdministrator') { throw "Installer requests administrator rights" }
+          if ($text -notmatch 'level="asInvoker"') { throw "Installer manifest is not asInvoker" }
+          Write-Host "OK: $($setup.Name) runs asInvoker (per-user, no UAC)"
+      - name: Assemble portable build
+        shell: pwsh
+        run: |
+          $dir = "portable/ToolCheckout-portable"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item target/release/ToolCheckout.exe "$dir/ToolCheckout.exe"
+          Set-Content -Path "$dir/portable" -Value "Data is stored in the 'data' folder next to ToolCheckout.exe."
+          Copy-Item packaging/README-portable.txt "$dir/README-portable.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ToolCheckout-windows-installer
+          path: target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ToolCheckout-windows-portable
+          path: portable/ToolCheckout-portable/
+          if-no-files-found: error
