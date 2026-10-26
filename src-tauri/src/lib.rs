@@ -60,6 +60,13 @@ pub fn run() {
             commands::reinstate_tool,
             commands::save_photo,
             commands::get_photo,
+            commands::borrower_picker,
+            commands::list_borrowers,
+            commands::get_borrower,
+            commands::create_borrower,
+            commands::update_borrower,
+            commands::set_borrower_pin,
+            commands::authenticate_borrower,
         ])
         .setup(move |app| {
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())

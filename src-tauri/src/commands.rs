@@ -302,3 +302,67 @@ pub fn get_photo(state: State<'_, AppState>, id: i64) -> CmdResult<String> {
     let (mime, bytes) = read(&state, |s| s.photo(id))?;
     Ok(format!("data:{mime};base64,{}", B64.encode(bytes)))
 }
+
+// ---------------------------------------------------------------- borrowers
+
+use toolcheckout_core::borrowers::{
+    Borrower, BorrowerAuth, BorrowerFilter, BorrowerInput, BorrowerPick, BorrowerRow,
+};
+
+#[tauri::command(async)]
+pub fn borrower_picker(state: State<'_, AppState>) -> CmdResult<Vec<BorrowerPick>> {
+    read(&state, |s| s.borrower_picker())
+}
+
+#[tauri::command(async)]
+pub fn list_borrowers(
+    state: State<'_, AppState>,
+    filter: BorrowerFilter,
+) -> CmdResult<Vec<BorrowerRow>> {
+    read(&state, |s| s.list_borrowers(&filter))
+}
+
+#[tauri::command(async)]
+pub fn get_borrower(state: State<'_, AppState>, id: i64) -> CmdResult<Borrower> {
+    read(&state, |s| s.get_borrower(id))
+}
+
+#[tauri::command(async)]
+pub fn create_borrower(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    input: BorrowerInput,
+    pin: Option<String>,
+) -> CmdResult<Borrower> {
+    write(&app, &state, |s| s.create_borrower(input, pin.as_deref()))
+}
+
+#[tauri::command(async)]
+pub fn update_borrower(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    input: BorrowerInput,
+    active: bool,
+) -> CmdResult<Borrower> {
+    write(&app, &state, |s| s.update_borrower(id, input, active))
+}
+
+#[tauri::command(async)]
+pub fn set_borrower_pin(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    pin: String,
+) -> CmdResult<()> {
+    write(&app, &state, |s| s.set_borrower_pin(id, &pin))
+}
+
+#[tauri::command(async)]
+pub fn authenticate_borrower(
+    state: State<'_, AppState>,
+    id: i64,
+    pin: Option<String>,
+) -> CmdResult<BorrowerAuth> {
+    read(&state, |s| s.authenticate_borrower(id, pin.as_deref()))
+}

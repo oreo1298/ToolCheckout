@@ -192,6 +192,43 @@ export interface ToolDetail {
   conditions: ConditionEvent[];
 }
 
+export interface Borrower {
+  id: number;
+  name: string;
+  employeeId: string;
+  badgeCode: string | null;
+  hasPin: boolean;
+  active: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface BorrowerRow extends Borrower {
+  openLoans: number;
+  overdueLoans: number;
+  lastCheckoutAt: number | null;
+}
+
+export interface BorrowerInput {
+  name: string;
+  employeeId: string;
+  badgeCode: string | null;
+}
+
+export interface BorrowerPick {
+  id: number;
+  name: string;
+  employeeId: string;
+  hasPin: boolean;
+  lastCheckoutAt: number | null;
+  recentCheckouts: number;
+}
+
+export interface BorrowerAuth {
+  token: string;
+  borrower: Borrower;
+}
+
 // ------------------------------------------------------------------ commands
 
 export const api = {
@@ -232,6 +269,16 @@ export const api = {
   retireTool: (id: number, reason: string) => call<Tool>('retire_tool', { id, reason }),
   reinstateTool: (id: number, condition: Condition, notes: string) =>
     call<Tool>('reinstate_tool', { id, condition, notes }),
+
+  borrowerPicker: () => call<BorrowerPick[]>('borrower_picker'),
+  listBorrowers: (filter: { search?: string; includeInactive?: boolean } = {}) =>
+    call<BorrowerRow[]>('list_borrowers', { filter }),
+  getBorrower: (id: number) => call<Borrower>('get_borrower', { id }),
+  createBorrower: (input: BorrowerInput, pin: string | null) => call<Borrower>('create_borrower', { input, pin }),
+  updateBorrower: (id: number, input: BorrowerInput, active: boolean) =>
+    call<Borrower>('update_borrower', { id, input, active }),
+  setBorrowerPin: (id: number, pin: string) => call<void>('set_borrower_pin', { id, pin }),
+  authenticateBorrower: (id: number, pin: string | null) => call<BorrowerAuth>('authenticate_borrower', { id, pin }),
 
   savePhoto: (data: string) => call<number>('save_photo', { data }),
   getPhoto: (id: number) => call<string>('get_photo', { id }),

@@ -11,6 +11,7 @@
     footer,
     size = 'md',
     dismissible = true,
+    backdropClose = false,
   }: {
     title: string;
     onclose: () => void;
@@ -18,6 +19,8 @@
     footer?: Snippet;
     size?: 'sm' | 'md' | 'lg' | 'xl';
     dismissible?: boolean;
+    /** Tapping outside closes it. Off by default so a stray tap can't discard a form. */
+    backdropClose?: boolean;
   } = $props();
 
   let el: HTMLDialogElement;
@@ -33,7 +36,7 @@
   }
 
   function backdrop(e: MouseEvent) {
-    if (dismissible && e.target === el) onclose();
+    if (dismissible && backdropClose && e.target === el) onclose();
   }
 </script>
 

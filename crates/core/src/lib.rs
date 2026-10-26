@@ -5,6 +5,7 @@
 //! reports all live here so they are unit-tested and can't be bypassed.
 
 pub mod audit;
+pub mod borrowers;
 pub mod clock;
 pub mod db;
 pub mod error;

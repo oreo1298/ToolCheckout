@@ -144,3 +144,21 @@ at the bottom of each group.
 * **Status changes use compare-and-set** (`… WHERE status = <expected>`), so two
   windows (or two Windows accounts sharing the data folder) can't both act on
   the same stale tool.
+
+## Borrowers
+
+* **Never deleted, only deactivated**, so their history and incidents stay
+  attributable. Deactivating someone who still has tools out is refused.
+* **Borrower PIN is set by the borrower** on the counter PC while a technician
+  has the Borrowers screen unlocked (enter twice). Required at creation while
+  "Borrowers confirm with PIN" is on (the default). A technician can reset it,
+  which also clears a lockout; the audit log records who reset whose PIN
+  (never the PIN or hash).
+* **Badge codes** are stored trimmed and upper-cased (scanner case doesn't
+  matter), must be unique, and may not look like a tool tag (`T` + digits) so a
+  scan is never ambiguous. Employee IDs also work as scan codes.
+* **Picker order:** people who borrowed in the last 7 days (most recent
+  first), then by number of checkouts in the last 90 days, then A–Z. The
+  usual borrowers are one tap away without a search.
+* **Borrower list/details are technician-only**; the checkout picker exposes
+  only active names (and employee IDs, to tell two "Alex"es apart).

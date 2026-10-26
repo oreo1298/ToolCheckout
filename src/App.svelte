@@ -4,6 +4,7 @@
   import Toasts from './lib/components/Toasts.svelte';
   import { countdown } from './lib/format';
   import UnlockDialog from './lib/flows/UnlockDialog.svelte';
+  import Borrowers from './lib/screens/Borrowers.svelte';
   import Settings from './lib/screens/Settings.svelte';
   import Setup from './lib/screens/Setup.svelte';
   import Tools from './lib/screens/Tools.svelte';
@@ -90,6 +91,8 @@
         <Settings />
       {:else if app.screen === 'tools'}
         <Tools />
+      {:else if app.screen === 'borrowers'}
+        <Borrowers />
       {:else}
         <h1>{nav.find((n) => n.id === app.screen)?.label}</h1>
         <p class="muted">Coming up in the next milestones.</p>
