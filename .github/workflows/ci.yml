@@ -6,9 +6,15 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Publish a GitHub Release for the version in src-tauri/tauri.conf.json
+        type: boolean
+        default: false
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Per event, so a push can't cancel a manually started release run.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
@@ -139,10 +145,12 @@ jobs:
           path: portable/ToolCheckout-portable/
           if-no-files-found: error
 
-  # Pushing a tag such as v0.2.0 publishes a GitHub Release with the builds.
+  # Publishes a GitHub Release with the builds, either when a tag such as
+  # v0.2.0 is pushed, or from Actions -> CI -> Run workflow with "Publish a
+  # GitHub Release" ticked (which creates the tag v<version> on that commit).
   release:
     name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release)
     needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     permissions:
@@ -152,14 +160,22 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Check the tag matches the app version
+      - name: Work out the version and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version=$(jq -r .version src-tauri/tauri.conf.json)
-          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+          tag="v$version"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
             echo "Tag $GITHUB_REF_NAME doesn't match version $version in src-tauri/tauri.conf.json" >&2
             exit 1
           fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists. Bump the version for a new release." >&2
+            exit 1
+          fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
       - name: Assemble release files
         run: |
           set -eu
@@ -177,7 +193,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release/* \
+          # For a manual run this also creates the tag, on the commit that
+          # was built.
+          gh release create "$TAG" release/* \
+            --target "$GITHUB_SHA" \
             --title "ToolCheckout $VERSION" \
-            --notes-file packaging/release-notes.md \
-            --verify-tag
+            --notes-file packaging/release-notes.md

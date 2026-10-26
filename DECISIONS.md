@@ -63,8 +63,12 @@ at the bottom of each group.
 * **Portable build** = the same `ToolCheckout.exe` plus a `portable` marker
   file and a short README, uploaded as a folder artifact. The marker switches
   all data (database, backups, WebView2 profile) to `data\` beside the exe.
-* **Releases** are published by CI when a `v*` tag is pushed: the release
-  job checks that the tag matches the version in `tauri.conf.json`, then
+* **Releases** are published by CI when a `v*` tag is pushed, or from a
+  manual "Run workflow" with *Publish a GitHub Release* ticked (CI then
+  creates the `v<version>` tag on the built commit; this is also how v0.1.0
+  was published, because this session could push only its branch, not tags).
+  The release job checks that a pushed tag matches the version in
+  `tauri.conf.json` and refuses to overwrite an existing release, then
   attaches the NSIS setup .exe, the portable build as a .zip (exe + `portable`
   marker + readme, so unzipping gives a ready folder), the AppImage, the .deb
   and `SHA256SUMS.txt`. No bare portable .exe: without its marker it would

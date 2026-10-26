@@ -779,9 +779,11 @@ cargo fmt --all --check
 real GNOME and KDE portal backends in a headless X session.
 
 **Releasing:** bump `version` in `package.json`, `Cargo.toml` and
-`src-tauri/tauri.conf.json`, commit, then push a tag such as `v0.2.0`. CI
-builds everything and publishes a GitHub Release with the Windows installer,
-the portable .zip, the AppImage, the .deb and `SHA256SUMS.txt`.
+`src-tauri/tauri.conf.json` and commit. Then either push a tag such as
+`v0.2.0`, or on GitHub open **Actions → CI → Run workflow**, tick **Publish a
+GitHub Release** and run it (that creates the tag for you). CI builds and tests
+everything and publishes a GitHub Release with the Windows installer, the
+portable .zip, the AppImage, the .deb and `SHA256SUMS.txt`.
 
 ### Layout
 
