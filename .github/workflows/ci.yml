@@ -138,3 +138,46 @@ jobs:
           name: ToolCheckout-windows-portable
           path: portable/ToolCheckout-portable/
           if-no-files-found: error
+
+  # Pushing a tag such as v0.2.0 publishes a GitHub Release with the builds.
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Check the tag matches the app version
+        run: |
+          version=$(jq -r .version src-tauri/tauri.conf.json)
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match version $version in src-tauri/tauri.conf.json" >&2
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Assemble release files
+        run: |
+          set -eu
+          mkdir release portable
+          cp artifacts/ToolCheckout-windows-installer/*-setup.exe release/
+          cp -r artifacts/ToolCheckout-windows-portable portable/ToolCheckout
+          (cd portable && zip -r -9 "../release/ToolCheckout_${VERSION}_x64-portable.zip" ToolCheckout)
+          cp artifacts/ToolCheckout-linux-appimage/*.AppImage release/
+          cp artifacts/ToolCheckout-linux-deb/*.deb release/
+          (cd release && sha256sum -- * > ../SHA256SUMS.txt)
+          mv SHA256SUMS.txt release/
+          cat release/SHA256SUMS.txt
+          unzip -l release/*-portable.zip
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --title "ToolCheckout $VERSION" \
+            --notes-file packaging/release-notes.md \
+            --verify-tag

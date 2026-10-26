@@ -1,0 +1,140 @@
+# Runs the README's "Build from source" commands for Linux, exactly as
+# written there, in a clean container of each distribution, as a normal user
+# with sudo. Each README command block is marked with
+# <!-- ci-linux: NAME -->; a matrix entry lists the blocks a reader of that
+# distribution follows, in order. If the README drifts from what works, this
+# workflow fails.
+name: Linux source build (README)
+
+on:
+  push:
+    paths:
+      - README.md
+      - scripts/install-linux.sh
+      - .github/workflows/linux-source-build.yml
+      - package.json
+      - package-lock.json
+      - Cargo.toml
+      - Cargo.lock
+      - src-tauri/Cargo.toml
+      - src-tauri/tauri.conf.json
+  pull_request:
+    paths:
+      - README.md
+      - scripts/install-linux.sh
+      - .github/workflows/linux-source-build.yml
+  schedule:
+    - cron: '17 5 1 * *' # monthly: catches distributions renaming packages
+  workflow_dispatch:
+
+concurrency:
+  group: linux-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 22.04
+            image: ubuntu:22.04
+            blocks: deps-debian node-nvm rust build-deb
+          - name: Ubuntu 24.04
+            image: ubuntu:24.04
+            blocks: deps-debian node-nvm rust build-deb
+          - name: Debian 12
+            image: debian:12
+            blocks: deps-debian node-nvm rust build-deb
+          - name: Debian 13
+            image: debian:13
+            blocks: deps-debian node-debian rust build-deb
+          - name: Fedora
+            image: fedora:latest
+            blocks: deps-fedora node-dnf rust build-rpm-dnf
+          - name: AlmaLinux 10
+            image: almalinux:10
+            blocks: deps-rhel node-dnf rust build-rpm-dnf
+          - name: Arch Linux
+            image: archlinux:latest
+            blocks: deps-arch rust build-local
+          - name: openSUSE Tumbleweed
+            image: opensuse/tumbleweed:latest
+            blocks: deps-opensuse node-opensuse rust build-rpm-zypper
+          - name: openSUSE Leap 16
+            image: opensuse/leap:16.0
+            blocks: deps-opensuse node-nvm rust build-rpm-zypper
+          - name: Void Linux
+            image: ghcr.io/void-linux/void-glibc-full:latest
+            blocks: deps-void rust build-local
+    steps:
+      # Test plumbing, not part of the README: sudo, a normal user, and git
+      # for the checkout (the README installs git itself, too).
+      - name: Create a normal user with sudo
+        shell: sh
+        run: |
+          set -eu
+          if command -v apt-get >/dev/null; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -q && apt-get install -y -q sudo git ca-certificates
+          elif command -v dnf >/dev/null; then
+            dnf install -y sudo git tar gzip
+          elif command -v pacman >/dev/null; then
+            pacman -Syu --noconfirm --needed sudo git
+          elif command -v zypper >/dev/null; then
+            zypper --non-interactive install sudo git tar gzip shadow
+          elif command -v xbps-install >/dev/null; then
+            xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo git bash
+          fi
+          useradd -m -s /bin/bash builder
+          printf '%s\n' 'builder ALL=(ALL) NOPASSWD: ALL' 'Defaults env_keep += "DEBIAN_FRONTEND"' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+
+      - uses: actions/checkout@v5
+
+      - name: Run the README's commands
+        shell: sh
+        run: |
+          set -eu
+          chown -R builder "$GITHUB_WORKSPACE"
+          steps=/tmp/readme-steps.sh
+          echo 'set -exo pipefail' > "$steps"
+          for block in ${{ matrix.blocks }}; do
+            sed -n "/^<!-- ci-linux: $block -->\$/,/^\`\`\`\$/p" README.md | sed '1,2d;$d' > /tmp/block
+            if [ ! -s /tmp/block ]; then echo "README has no block named $block" >&2; exit 1; fi
+            { echo "# ---- README block: $block"; cat /tmp/block; } >> "$steps"
+          done
+          # Answer package-manager prompts (a person would press Enter).
+          sed -i -e 's/apt install /apt install -y /' -e 's/dnf install /dnf install -y /' \
+            -e 's/pacman -S/pacman --noconfirm -S/' -e 's/zypper install /zypper --non-interactive install /' \
+            -e 's/xbps-install /xbps-install -y /' "$steps"
+          chmod 644 "$steps"
+          cat "$steps"
+          su - builder -c "cd '$GITHUB_WORKSPACE' && DEBIAN_FRONTEND=noninteractive bash $steps"
+
+      - name: Check the installed app
+        shell: sh
+        run: |
+          set -eu
+          command -v rpm >/dev/null && rpm -qi tool-checkout || true
+          command -v dpkg >/dev/null && dpkg -s tool-checkout || true
+          su - builder -c '
+            set -eu
+            bin=""
+            for b in /usr/bin/ToolCheckout "$HOME/.local/bin/ToolCheckout"; do [ -x "$b" ] && bin=$b; done
+            test -n "$bin" || { echo "ToolCheckout was not installed" >&2; exit 1; }
+            echo "Installed at $bin"
+            ls /usr/share/applications/ToolCheckout.desktop "$HOME/.local/share/applications/ToolCheckout.desktop" 2>/dev/null | grep -q . \
+              || { echo "No menu entry was installed" >&2; exit 1; }
+            ldd "$bin" > /tmp/ldd.txt
+            if grep "not found" /tmp/ldd.txt; then echo "Missing libraries" >&2; exit 1; fi
+            echo "All $(wc -l < /tmp/ldd.txt) libraries resolve."
+            if [ "$bin" = "$HOME/.local/bin/ToolCheckout" ]; then
+              cd "'"$GITHUB_WORKSPACE"'" && ./scripts/install-linux.sh --uninstall
+              test ! -e "$bin" && test ! -e "$HOME/.local/share/applications/ToolCheckout.desktop"
+            fi
+          '

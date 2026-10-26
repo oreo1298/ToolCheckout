@@ -37,28 +37,32 @@ screen (see [Demo mode](#demo-mode)).
 * [What the audit log can and can't do](#what-the-audit-log-can-and-cant-do)
 * [Demo mode](#demo-mode)
 * [Where your data lives](#where-your-data-lives)
-* [Building from source](#building-from-source)
+* [Development](#development)
 
 ---
 
 ## Download
 
-Builds are produced by GitHub Actions on every push:
+Get the newest version from the
+**[Releases page](https://github.com/oreo1298/ToolCheckout/releases/latest)**:
 
-1. Open the repository on GitHub and go to **Actions → CI**.
-2. Open the newest run with a green check mark.
-3. Under **Artifacts**, download the build you need. Each one comes as a .zip
-   file.
-
-| Artifact                        | Contains                                              |
-| ------------------------------- | ----------------------------------------------------- |
-| `ToolCheckout-windows-installer` | `ToolCheckout_<version>_x64-setup.exe` (per-user installer) |
-| `ToolCheckout-windows-portable`  | `ToolCheckout.exe`, a `portable` marker file, a short readme |
-| `ToolCheckout-linux-appimage`    | `ToolCheckout_<version>_amd64.AppImage`              |
-| `ToolCheckout-linux-deb`         | `ToolCheckout_<version>_amd64.deb`                   |
+| File                                     | Use it for                                                        |
+| ---------------------------------------- | ----------------------------------------------------------------- |
+| `ToolCheckout_<version>_x64-setup.exe`   | **Windows 10/11 (recommended).** Installs for the current user, no administrator needed |
+| `ToolCheckout_<version>_x64-portable.zip` | Windows, nothing installed: runs from a folder or USB stick       |
+| `ToolCheckout_<version>_amd64.AppImage`  | Linux, any modern x86_64 distribution, no root needed             |
+| `ToolCheckout_<version>_amd64.deb`       | Debian 12+, Ubuntu 22.04+, Linux Mint 21+ and other Ubuntu-based distributions |
+| `SHA256SUMS.txt`                         | Checksums, if you want to verify a download                       |
 
 The builds are **not code-signed**. Windows will warn about that the first time
-(see below).
+(see below). To check that a download arrived intact, compare its checksum
+with the one in `SHA256SUMS.txt`: in PowerShell run
+`Get-FileHash .\ToolCheckout_<version>_x64-setup.exe`, and on Linux run
+`sha256sum -c --ignore-missing SHA256SUMS.txt` in the download folder.
+
+Every commit is also built by GitHub Actions (**Actions → CI →** a run **→
+Artifacts**). Those builds are for testing. Use the Releases page for the
+shop PC.
 
 ---
 
@@ -71,11 +75,12 @@ it: something is wrong.
 
 ### Option A: installer (recommended)
 
-1. Download and unzip `ToolCheckout-windows-installer`.
+1. Download `ToolCheckout_<version>_x64-setup.exe` from the
+   [Releases page](https://github.com/oreo1298/ToolCheckout/releases/latest).
 2. Your browser may warn that the file "isn't commonly downloaded". In Edge,
    open the **…** menu on the download and choose **Keep**, then
    **Show more → Keep anyway**.
-3. Double-click `ToolCheckout_<version>_x64-setup.exe`.
+3. Double-click the downloaded file.
 4. If Windows shows **"Windows protected your PC"** (SmartScreen), click
    **More info**, then **Run anyway**. This happens because the build isn't
    code-signed. It's a one-time warning per file.
@@ -88,6 +93,8 @@ Windows 11 and of Windows 10 with current updates. On the rare PC without it,
 the installer downloads Microsoft's per-user WebView2 installer, which also
 doesn't need administrator rights (this needs an internet connection once).
 
+**Updating:** run the newer `setup.exe` the same way. Your data is kept.
+
 **Uninstalling** (Settings → Apps → ToolCheckout → Uninstall) removes the
 program but **keeps your data and backups**, even if you tick "Delete the
 application data". That box only clears the WebView cache. To remove
@@ -98,49 +105,335 @@ everything, delete `%LOCALAPPDATA%\ToolCheckout` yourself afterwards.
 The portable build runs from any folder you can write to, such as a USB stick,
 `Documents\ToolCheckout` or the Desktop.
 
-1. Download and unzip `ToolCheckout-windows-portable`.
-2. Keep `ToolCheckout.exe` and the file named `portable` together in the same
-   folder.
+1. Download `ToolCheckout_<version>_x64-portable.zip` and unzip it. Before
+   unzipping, you can right-click the .zip → **Properties** → tick
+   **Unblock** → **OK**, so Windows doesn't warn about every file inside.
+2. Keep `ToolCheckout.exe` and the file named `portable` together in the
+   `ToolCheckout` folder you unzipped.
 3. Double-click `ToolCheckout.exe`. If SmartScreen appears, click
    **More info → Run anyway**.
 
 While the `portable` file sits next to the exe, *all* data (database, backups
 and the WebView cache) goes into a `data` folder beside the exe, and nothing is
 written anywhere else. Delete the `portable` file to use the normal per-user
-data folder instead.
+data folder instead. To update, replace `ToolCheckout.exe` with the newer one
+and keep the `data` folder.
 
 ---
 
 ## Install on Linux
 
-Use either the AppImage or the .deb on x86_64 Linux. Both were tested on
-Ubuntu 22.04 with GNOME and KDE Plasma.
+There are three ways, for x86_64 PCs:
 
-### AppImage (no root needed)
+* **[AppImage](#appimage)**: a single file that runs on almost any current
+  distribution. No root needed.
+* **[.deb package](#deb-package-debian-ubuntu-mint)** for Debian, Ubuntu,
+  Linux Mint and other Ubuntu-based distributions. It adds a menu entry.
+* **[Build from source](#build-from-source)**. You'll need this for a native
+  package or menu entry on Fedora, Arch, openSUSE, Void and others. It's
+  also an option on any distribution.
+
+### AppImage
 
 ```sh
 chmod +x ToolCheckout_*_amd64.AppImage
 ./ToolCheckout_*_amd64.AppImage
 ```
 
-AppImages need FUSE 2. If the AppImage won't start, either install
-it (`sudo apt install libfuse2`, or `libfuse2t64` on Ubuntu 24.04+) or run it
-without FUSE:
+The AppImage carries its own copy of WebKitGTK, so it needs nothing else
+installed except FUSE 2. It needs glibc 2.35 or newer (check with
+`ldd --version`). That covers Ubuntu 22.04+, Debian 12+, Linux Mint 21+,
+Fedora 36+, openSUSE Tumbleweed and Leap 16, Arch, and RHEL/AlmaLinux/Rocky 10.
+
+If it won't start because FUSE is missing, install it
+(`sudo apt install libfuse2`, `libfuse2t64` on Ubuntu 24.04+,
+`sudo dnf install fuse-libs`, `sudo pacman -S fuse2`,
+`sudo zypper install libfuse2`) or run it without FUSE:
 
 ```sh
 ./ToolCheckout_*_amd64.AppImage --appimage-extract-and-run
 ```
 
-### .deb (Debian, Ubuntu, Mint…)
+To get a menu entry for an AppImage, use a helper such as Gear Lever or
+AppImageLauncher, or [build from source](#build-from-source) instead.
+
+**Fedora Silverblue, Kinoite, Bazzite and other immutable systems:** use the
+AppImage. **NixOS:** run it with
+`nix-shell -p appimage-run --run "appimage-run ./ToolCheckout_*_amd64.AppImage"`,
+or set `programs.appimage.enable = true;` and
+`programs.appimage.binfmt = true;` in your configuration to run AppImages
+directly.
+
+### .deb package (Debian, Ubuntu, Mint…)
 
 ```sh
 sudo apt install ./ToolCheckout_*_amd64.deb
 ```
 
-Installing the .deb adds ToolCheckout to the application menu. Like any system
-package it needs `sudo`. Use the AppImage if you don't have that.
+The `./` matters: it tells apt to install the downloaded file. This works on
+Debian 12+, Ubuntu 22.04+, Linux Mint 21+, Pop!_OS 22.04+, elementary OS 7+,
+Zorin OS 17+ and KDE neon. To update, install the newer .deb the same way.
+To uninstall, run `sudo apt remove tool-checkout`. Your data is kept either
+way.
 
-### Theme and notifications
+### Build from source
+
+These steps build ToolCheckout on your own PC and install it like any other
+app. Expect 5 to 15 minutes for the first build, and about 3 GB of free disk
+space. Most of that is Rust's build cache, which you can delete afterwards
+with `rm -rf target`.
+
+You need a C compiler, `pkg-config`, the WebKitGTK 4.1 and D-Bus development
+files, Git and curl (step 1), Rust 1.90 or newer (step 2), and Node.js 20.19+
+or 22.12+ with npm (step 3).
+
+| Distribution | Step 1 | Step 3 (Node.js) | Step 5 (install as) | Tested in CI |
+| --- | --- | --- | --- | :-: |
+| Ubuntu 22.04+, Linux Mint 21+, Pop!\_OS, elementary OS, Zorin OS, KDE neon | [Debian / Ubuntu](#debian-ubuntu-and-derivatives) | [nvm](#nodejs-from-nvm) | [.deb](#debian-ubuntu-and-derivatives-1) | ✓ |
+| Debian 13 | [Debian / Ubuntu](#debian-ubuntu-and-derivatives) | [apt](#nodejs-from-your-distribution) | [.deb](#debian-ubuntu-and-derivatives-1) | ✓ |
+| Debian 12 | [Debian / Ubuntu](#debian-ubuntu-and-derivatives) | [nvm](#nodejs-from-nvm) | [.deb](#debian-ubuntu-and-derivatives-1) | ✓ |
+| Fedora 41+ | [Fedora](#fedora) | [dnf](#nodejs-from-your-distribution) | [.rpm](#fedora-rhel-almalinux-rocky) | ✓ |
+| RHEL, AlmaLinux, Rocky Linux 10 | [RHEL family](#rhel-almalinux-rocky-linux-10) | [dnf](#nodejs-from-your-distribution) | [.rpm](#fedora-rhel-almalinux-rocky) | ✓ |
+| Arch, Manjaro, EndeavourOS, Garuda | [Arch](#arch-linux-and-derivatives) | [pacman](#nodejs-from-your-distribution) | [install script](#any-other-distribution) | ✓ |
+| openSUSE Tumbleweed | [openSUSE](#opensuse) | [zypper](#nodejs-from-your-distribution) | [.rpm](#opensuse-1) | ✓ |
+| openSUSE Leap 16 | [openSUSE](#opensuse) | [nvm](#nodejs-from-nvm) | [.rpm](#opensuse-1) | ✓ |
+| Void Linux | [Void](#void-linux) | [xbps](#nodejs-from-your-distribution) | [install script](#any-other-distribution) | ✓ |
+| Gentoo | [Gentoo](#gentoo) | [emerge](#nodejs-from-your-distribution) | [install script](#any-other-distribution) | – |
+
+"Tested in CI" means a GitHub Actions workflow
+(`.github/workflows/linux-source-build.yml`) runs the commands below, as
+written in this README, on a clean container of that distribution as a normal
+user with `sudo`. It then checks that the installed app finds all of its
+libraries. Ubuntu-based distributions follow their Ubuntu base. Older releases
+(Ubuntu 20.04, Debian 11, Linux Mint 20, Fedora 35 and earlier) don't ship
+WebKitGTK 4.1, so they can't build ToolCheckout. Their glibc is also too old
+for the AppImage, so upgrade the distribution first.
+
+#### Step 1: system packages
+
+##### Debian, Ubuntu and derivatives
+
+<!-- ci-linux: deps-debian -->
+```sh
+sudo apt update
+sudo apt install build-essential pkg-config curl git \
+  libwebkit2gtk-4.1-dev libdbus-1-dev
+```
+
+##### Fedora
+
+<!-- ci-linux: deps-fedora -->
+```sh
+sudo dnf install gcc pkgconf-pkg-config curl git \
+  webkit2gtk4.1-devel dbus-devel
+```
+
+##### RHEL, AlmaLinux, Rocky Linux 10
+
+The WebKitGTK development files are in the CodeReady Builder (CRB)
+repository. On RHEL itself, enable it with
+`sudo subscription-manager repos --enable codeready-builder-for-rhel-10-x86_64-rpms`
+instead of the `config-manager` line.
+
+<!-- ci-linux: deps-rhel -->
+```sh
+sudo dnf install dnf-plugins-core
+sudo dnf config-manager --set-enabled crb
+sudo dnf install gcc pkgconf-pkg-config curl git \
+  webkit2gtk4.1-devel dbus-devel
+```
+
+##### Arch Linux and derivatives
+
+Arch, Manjaro, EndeavourOS, Garuda and others. This also installs Node.js
+(step 3).
+
+<!-- ci-linux: deps-arch -->
+```sh
+sudo pacman -Syu --needed base-devel curl git webkit2gtk-4.1 nodejs npm
+```
+
+##### openSUSE
+
+Tumbleweed and Leap 16. `webkit2gtk3-devel` is openSUSE's name for WebKitGTK
+4.1 built for GTK 3, which is the one ToolCheckout needs.
+
+<!-- ci-linux: deps-opensuse -->
+```sh
+sudo zypper install gcc pkg-config curl git \
+  webkit2gtk3-devel dbus-1-devel
+```
+
+##### Void Linux
+
+This also installs Node.js (step 3).
+
+<!-- ci-linux: deps-void -->
+```sh
+sudo xbps-install -Su base-devel pkg-config curl git \
+  libwebkit2gtk41-devel dbus-devel nodejs
+```
+
+##### Gentoo
+
+Not tested by us. WebKitGTK is large, so allow time for it to compile unless
+you use the binary package host.
+
+```sh
+sudo emerge --ask --noreplace net-libs/webkit-gtk:4.1 sys-apps/dbus \
+  dev-vcs/git net-misc/curl net-libs/nodejs
+```
+
+#### Step 2: Rust
+
+Use `rustup`, the official installer. It installs into your home folder
+(`~/.cargo`, `~/.rustup`) and doesn't need root. A Rust from your distribution
+works too if `rustc --version` says 1.90 or newer.
+
+<!-- ci-linux: rust -->
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+. "$HOME/.cargo/env"
+```
+
+New terminals pick up Rust automatically. `rustup update` updates it later.
+
+#### Step 3: Node.js
+
+You need Node.js 20.19+ or 22.12+ with npm. If `node --version` already shows
+a new enough version, skip this step.
+
+##### Node.js from your distribution
+
+These distributions ship a new enough Node.js. Arch and Void already got it in
+step 1.
+
+<!-- ci-linux: node-debian -->
+```sh
+sudo apt install nodejs npm                   # Debian 13
+```
+
+<!-- ci-linux: node-dnf -->
+```sh
+sudo dnf install nodejs npm                   # Fedora, RHEL, AlmaLinux, Rocky
+```
+
+<!-- ci-linux: node-opensuse -->
+```sh
+sudo zypper install nodejs-default npm-default   # openSUSE Tumbleweed
+```
+
+On Gentoo, `net-libs/nodejs` came with step 1.
+
+##### Node.js from nvm
+
+Ubuntu and Ubuntu-based distributions, Debian 12, openSUSE Leap and anything
+else whose Node.js is too old: install it per user with
+[nvm](https://github.com/nvm-sh/nvm). No root needed, and it doesn't touch the
+system's Node.js.
+
+<!-- ci-linux: node-nvm -->
+```sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+. "$HOME/.nvm/nvm.sh"
+nvm install 22
+```
+
+#### Step 4: get the code
+
+```sh
+git clone https://github.com/oreo1298/ToolCheckout.git
+cd ToolCheckout
+```
+
+That gets the newest code. To build a specific release instead, run
+`git checkout v0.1.0` (any tag from the
+[Releases page](https://github.com/oreo1298/ToolCheckout/releases)).
+
+#### Step 5: build and install
+
+Run these in the `ToolCheckout` folder. `npm ci` downloads the JavaScript
+build tools (into `node_modules`, nothing system-wide). `npx tauri build`
+compiles the app and makes the package.
+
+##### Debian, Ubuntu and derivatives
+
+<!-- ci-linux: build-deb -->
+```sh
+npm ci
+npx tauri build --bundles deb
+sudo apt install ./target/release/bundle/deb/ToolCheckout_*_amd64.deb
+```
+
+apt may print a note that the download is "performed unsandboxed as root".
+That's harmless for a local file. To uninstall: `sudo apt remove tool-checkout`.
+
+##### Fedora, RHEL, AlmaLinux, Rocky
+
+<!-- ci-linux: build-rpm-dnf -->
+```sh
+npm ci
+npx tauri build --bundles rpm
+sudo dnf install ./target/release/bundle/rpm/ToolCheckout-*.x86_64.rpm
+```
+
+To uninstall: `sudo dnf remove tool-checkout`.
+
+##### openSUSE
+
+<!-- ci-linux: build-rpm-zypper -->
+```sh
+npm ci
+npx tauri build --bundles rpm
+sudo zypper install --allow-unsigned-rpm ./target/release/bundle/rpm/ToolCheckout-*.x86_64.rpm
+```
+
+To uninstall: `sudo zypper remove tool-checkout`.
+
+##### Any other distribution
+
+Arch, Void, Gentoo and everything else. This builds just the program, then
+installs it for you only into `~/.local`, with a menu entry and icon (no
+root). Use `sudo ./scripts/install-linux.sh --system` to install it for all
+users into `/usr/local` instead.
+
+<!-- ci-linux: build-local -->
+```sh
+npm ci
+npx tauri build --no-bundle
+./scripts/install-linux.sh
+```
+
+To uninstall: `./scripts/install-linux.sh --uninstall` (add `--system` if you
+installed with it).
+
+You can also run the freshly built program without installing it:
+`./target/release/ToolCheckout`.
+
+#### After installing
+
+ToolCheckout is in your application menu (on some desktops, after logging
+out and back in), or start it with `ToolCheckout` in a terminal. Uninstalling
+never removes your data in `~/.local/share/toolcheckout`.
+
+**Updating a source build:** in the `ToolCheckout` folder, run `git pull` (or
+`git fetch --tags` and `git checkout` the new release tag), then repeat
+step 5.
+
+#### If the build fails
+
+* **`Package webkit2gtk-4.1 was not found`** (or `dbus-1`): the step 1
+  packages are missing, or your distribution is too old to have WebKitGTK 4.1.
+* **`rustc 1.xx is not supported`** or similar: run `rustup update`. A
+  distribution's Rust may be too old; use rustup (step 2).
+* **`npm ci` reports `EBADENGINE` or Vite says Node.js is too old**: install
+  Node.js 22 with nvm (step 3), then open a new terminal.
+* **`npx: command not found`**: npm isn't installed. On Debian and Ubuntu it's
+  the separate `npm` package; with nvm it comes with Node.js.
+* **The build is killed or the PC freezes** (low memory): build with fewer
+  parallel jobs, e.g. `CARGO_BUILD_JOBS=2 npx tauri build …`.
+
+### Theme, notifications and display problems
 
 ToolCheckout follows the desktop's light/dark setting live, through the
 freedesktop settings portal. It also picks up the accent color where the
@@ -149,6 +442,12 @@ desktop, install the portal backend for it: `xdg-desktop-portal-gnome`,
 `xdg-desktop-portal-kde` or `xdg-desktop-portal-gtk`. You can always pick
 Light or Dark in **Settings → Appearance**. Overdue notifications use the
 standard desktop notification service.
+
+If the window stays blank or flickers (seen with some NVIDIA drivers and in
+virtual machines), start it with WebKitGTK's DMA-BUF renderer turned off:
+`WEBKIT_DISABLE_DMABUF_RENDERER=1 ToolCheckout`. To make that permanent for a
+source install, add it to the `Exec=` line of the menu entry, e.g.
+`Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 ToolCheckout`.
 
 ---
 
@@ -441,21 +740,22 @@ location.
 
 ---
 
-## Building from source
+## Development
 
-You need [Rust](https://rustup.rs) (stable) and Node.js 22 or later. On Linux
-you also need the WebKitGTK development packages:
+Setting up a development machine:
 
-```sh
-sudo apt install libwebkit2gtk-4.1-dev librsvg2-dev libssl-dev libxdo-dev patchelf
-```
+* **Linux:** steps 1 to 3 of [Build from source](#build-from-source).
+* **Windows:** [Rust](https://rustup.rs) with the "Desktop development with
+  C++" workload of Visual Studio Build Tools (the rustup installer offers
+  it), and Node.js 22. WebView2 is already part of Windows 10/11.
 
-Then:
+Then, in the repository:
 
 ```sh
 npm ci
-npm run tauri dev                     # run with hot reload
-npm run tauri build                   # installers into target/release/bundle/
+npx tauri dev                          # run with hot reload
+npx tauri build --bundles deb          # Linux: or rpm, appimage; --no-bundle for just the program
+npx tauri build --bundles nsis         # Windows installer
 ```
 
 Tests and checks (the same ones CI runs):
@@ -471,6 +771,11 @@ cargo fmt --all --check
 `scripts/linux-theme-check.sh` reproduces the live light/dark check against
 real GNOME and KDE portal backends in a headless X session.
 
+**Releasing:** bump `version` in `package.json`, `Cargo.toml` and
+`src-tauri/tauri.conf.json`, commit, then push a tag such as `v0.2.0`. CI
+builds everything and publishes a GitHub Release with the Windows installer,
+the portable .zip, the AppImage, the .deb and `SHA256SUMS.txt`.
+
 ### Layout
 
 | Path                    | What                                                                  |
@@ -478,6 +783,8 @@ real GNOME and KDE portal backends in a headless X session.
 | `crates/core`           | All business logic and the SQLite data layer (no UI or Tauri code), so it can later sit behind a server |
 | `src-tauri`             | The desktop shell: Tauri commands, OS theme/accent, notifications, background jobs |
 | `src`                   | The Svelte + TypeScript UI                                            |
-| `.github/workflows/ci.yml` | Tests on Linux and Windows; builds the NSIS installer, portable exe, AppImage and .deb |
+| `.github/workflows/ci.yml` | Tests on Linux and Windows; builds the NSIS installer, portable exe, AppImage and .deb; publishes releases for `v*` tags |
+| `.github/workflows/linux-source-build.yml` | Runs this README's Linux build-from-source commands on each listed distribution |
+| `scripts/install-linux.sh` | Installs a source build with a menu entry (`--system`, `--uninstall`) |
 | `PLAN.md`               | Architecture, data model, milestones                                  |
 | `DECISIONS.md`          | Every judgment call made along the way, and why                      |

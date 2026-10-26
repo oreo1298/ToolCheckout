@@ -63,6 +63,34 @@ at the bottom of each group.
 * **Portable build** = the same `ToolCheckout.exe` plus a `portable` marker
   file and a short README, uploaded as a folder artifact. The marker switches
   all data (database, backups, WebView2 profile) to `data\` beside the exe.
+* **Releases** are published by CI when a `v*` tag is pushed: the release
+  job checks that the tag matches the version in `tauri.conf.json`, then
+  attaches the NSIS setup .exe, the portable build as a .zip (exe + `portable`
+  marker + readme, so unzipping gives a ready folder), the AppImage, the .deb
+  and `SHA256SUMS.txt`. No bare portable .exe: without its marker it would
+  silently use the per-user data folder, which is what the installer is for.
+  No .rpm in releases: Tauri's rpm has no distribution-neutral dependency
+  names, so Fedora/openSUSE users build it from source (README).
+* **Linux build-from-source docs are tested.** Each README command block is
+  tagged `<!-- ci-linux: NAME -->`. `linux-source-build.yml` extracts the
+  blocks a reader of each distribution follows and runs them unchanged (apart
+  from auto-answering package-manager prompts) in clean containers, as a
+  non-root user with sudo, then checks that the installed binary resolves all
+  its libraries. It runs when the README, the install script or the
+  dependency manifests change, and monthly to catch package renames.
+* **Minimal Linux build dependencies.** The lockfile has no `openssl-sys` or
+  `libxdo-sys`, and the tray library is loaded at runtime, so Tauri's generic
+  list (OpenSSL, libxdo, appindicator, librsvg) isn't needed. What is needed:
+  a C compiler (bundled SQLite), pkg-config, WebKitGTK 4.1 (which brings GTK
+  3 and libsoup 3) and D-Bus (linked by `tao`).
+* **Minimum Rust is 1.90** (`rust-version`), the newest requirement among the
+  locked dependencies (Tauri 2.12, muda). Checked by compiling the workspace
+  with Rust 1.90. The README recommends rustup because distribution Rust is
+  often older.
+* **`scripts/install-linux.sh`** installs a `--no-bundle` build for
+  distributions without .deb/.rpm (Arch, Void, Gentoo…): binary, menu entry
+  and icons under `~/.local` (or `/usr/local` with `--system`), mirroring the
+  .deb's file names, with `--uninstall`.
 * **Mobile crate types dropped.** The template's `staticlib`/`cdylib` are only
   for iOS/Android and roughly doubled link time and disk use.
 
