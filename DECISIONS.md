@@ -65,3 +65,56 @@ at the bottom of each group.
   all data (database, backups, WebView2 profile) to `data\` beside the exe.
 * **Mobile crate types dropped.** The template's `staticlib`/`cdylib` are only
   for iOS/Android and roughly doubled link time and disk use.
+
+## Security & accountability
+
+* **Tech unlock = pick your name, then PIN.** With several technicians, a
+  bare PIN would have to be tried against every hash, and a lockout could not
+  be tied to one account. With one technician the name is pre-selected, so
+  it's just the PIN.
+* **Lockout escalation:** 4 wrong PINs only count; the 5th locks for 30 s;
+  each further wrong PIN in the same streak locks at the next step (1 m,
+  5 m, 15 m, then 1 h each). A correct PIN resets the streak; so does a day
+  without lockouts (so one typo next week doesn't re-lock instantly). The
+  lockout state is committed even when the attempt fails, so retrying can't
+  roll it back. Lockouts are written to the audit log; individual wrong PINs
+  are not (they'd swamp the log, and the lockout entry says how many).
+* **PINs:** Argon2id (RustCrypto defaults: 19 MiB, t=2, p=1), random salt per
+  hash. Technician PINs 4–8 digits (6 suggested), borrower PINs exactly 4.
+* **Recovery code:** 16 Crockford-base32 characters (80 bits) shown once at
+  setup, stored only as an Argon2id hash. Using it sets a new PIN for a
+  chosen technician, clears that technician's lockout, and immediately
+  issues a replacement code (each code works once). Recovery attempts have
+  their own lockout. A technician can regenerate the code in Settings.
+* **Borrower confirmation tokens:** entering a borrower PIN mints a random
+  128-bit token valid for 3 minutes. Checkout, problem reports and drop-offs
+  require a valid token, so the multi-step UI can't skip the PIN check and the
+  PIN is hashed only once per checkout.
+* **Tech session** lives only in memory: restarting the app locks it. The UI
+  sends a throttled "activity" ping on any tap/keypress, which extends the
+  window; every tech-only command also checks and extends it in the backend.
+* **Audit log:** one row per action, written in the same transaction as the
+  change. `hash = SHA-256("toolcheckout-audit-v1" ‖ length-prefixed fields ‖
+  prev_hash)`. Triggers block UPDATE/DELETE. "Verify log integrity" walks the
+  chain and names the first broken entry and why (edited, missing, relinked).
+  Limitation, stated in the README too: someone with file access can drop the
+  triggers and rewrite the *entire* chain consistently. Comparing against an
+  older backup catches that (`audit::verify_prefix_matches`), so keep backups
+  somewhere the counter PC's users can't edit.
+* **Settings** are stored one key per row; a malformed value falls back to its
+  default instead of preventing startup. Changes are audited with only the
+  keys that changed.
+
+## Data
+
+* **Timestamps** are UTC milliseconds (INTEGER); money is integer cents.
+  All tables are `STRICT`. Every migration runs in its own transaction and
+  bumps `PRAGMA user_version`; a database from a newer app version is refused
+  with a clear message instead of being opened.
+* **Data folder** resolution order: `portable` marker → `TOOLCHECKOUT_DATA_DIR`
+  env var (for testing) → custom folder from a pointer file in the default
+  folder → default per-user folder. `%LOCALAPPDATA%\ToolCheckout` on Windows,
+  `$XDG_DATA_HOME/toolcheckout` on Linux (rather than Tauri's
+  identifier-named folder, which is less discoverable).
+* If the database can't be opened, the app shows the reason instead of
+  crashing (e.g. a custom folder on a disconnected drive).

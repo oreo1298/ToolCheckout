@@ -1,10 +1,10 @@
 import './app.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
+import { app } from './lib/app.svelte';
 import { startTheme } from './lib/themeBoot';
 
-startTheme();
+void startTheme();
+app.init().catch((e) => console.error('init failed', e));
 
-const app = mount(App, { target: document.getElementById('app')! });
-
-export default app;
+export default mount(App, { target: document.getElementById('app')! });
