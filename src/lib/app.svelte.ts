@@ -1,7 +1,17 @@
 // App-wide reactive state: bootstrap info, tech session, navigation, toasts,
 // and the "ask for a technician PIN" flow.
 import { listen } from '@tauri-apps/api/event';
-import { api, asApiError, type AppStatus, type Bootstrap, type TechSession } from './api';
+import {
+  api,
+  asApiError,
+  type AppStatus,
+  type AwaitingItem,
+  type Bootstrap,
+  type BorrowerPick,
+  type LoanRow,
+  type TechSession,
+  type ToolRow,
+} from './api';
 import { theme } from './themeBoot';
 
 export type Screen = 'home' | 'tools' | 'borrowers' | 'incidents' | 'reports' | 'settings';
@@ -11,6 +21,12 @@ export interface Toast {
   kind: 'success' | 'error' | 'info';
   text: string;
 }
+
+/** The full-screen task sheet currently open, if any. */
+export type Flow =
+  | { kind: 'checkout'; tools: ToolRow[]; borrower: BorrowerPick | null }
+  | { kind: 'return'; loans: LoanRow[] }
+  | { kind: 'inspect'; item: AwaitingItem };
 
 interface UnlockRequest {
   reason?: string;
@@ -29,6 +45,7 @@ class AppStore {
   /** Ticks every second for countdowns and "how long" labels. */
   nowMs = $state(Date.now());
   unlockRequest = $state<UnlockRequest | null>(null);
+  flow = $state<Flow | null>(null);
   /** Tool whose detail panel is open (from any screen). */
   toolDetailId = $state<number | null>(null);
   /** True from a not-set-up start until the recovery code is acknowledged. */

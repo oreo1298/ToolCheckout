@@ -190,6 +190,136 @@ export interface ConditionEvent {
 export interface ToolDetail {
   row: ToolRow;
   conditions: ConditionEvent[];
+  loans: LoanRow[];
+  incidents: Incident[];
+}
+
+export type CheckoutState = 'out' | 'awaiting_inspection' | 'closed' | 'lost';
+
+export interface LoanRow {
+  id: number;
+  batchId: string;
+  toolId: number;
+  assetTag: string;
+  toolName: string;
+  toolPhotoId: number | null;
+  toolStatus: ToolStatus;
+  borrowerId: number;
+  borrowerName: string;
+  checkedOutAt: number;
+  dueAt: number;
+  checkoutCondition: Condition;
+  authorizedBy: string | null;
+  state: CheckoutState;
+  returnedAt: number | null;
+  dropoffNote: string;
+  inspectedAt: number | null;
+  inspectedBy: string | null;
+  returnCondition: Condition | null;
+  returnNotes: string;
+  returnPhotoId: number | null;
+  overdue: boolean;
+  lateMs: number | null;
+}
+
+export interface AwaitingItem {
+  kind: 'dropoff' | 'problem_report';
+  toolId: number;
+  assetTag: string;
+  toolName: string;
+  toolPhotoId: number | null;
+  checkoutId: number | null;
+  incidentId: number | null;
+  borrowerId: number | null;
+  borrowerName: string | null;
+  since: number;
+  note: string;
+  conditionBefore: Condition;
+  returnedLate: boolean;
+}
+
+export interface Home {
+  overdue: LoanRow[];
+  out: LoanRow[];
+  awaiting: AwaitingItem[];
+  openIncidents: number;
+  availableTools: number;
+  now: number;
+}
+
+export type ScanResult =
+  | { kind: 'tool'; tool: ToolRow; loan: LoanRow | null }
+  | { kind: 'borrower'; borrower: BorrowerPick }
+  | { kind: 'unknown'; code: string; message: string };
+
+export interface CheckoutItem {
+  toolId: number;
+  dueAt: number | null;
+}
+
+export interface CheckoutReceipt {
+  batchId: string;
+  borrower: Borrower;
+  loans: LoanRow[];
+}
+
+export type IncidentKind = 'damage' | 'lost' | 'problem_report';
+export type Outcome =
+  | 'no_fault'
+  | 'borrower_damaged'
+  | 'repaired'
+  | 'replaced'
+  | 'borrower_paid'
+  | 'found'
+  | 'inspected'
+  | 'written_off'
+  | 'other';
+
+export interface Incident {
+  id: number;
+  kind: IncidentKind;
+  toolId: number;
+  assetTag: string;
+  toolName: string;
+  replacementCostCents: number | null;
+  borrowerId: number | null;
+  borrowerName: string | null;
+  checkoutId: number | null;
+  beforeCondition: Condition | null;
+  afterCondition: Condition | null;
+  notes: string;
+  photoIds: number[];
+  createdAt: number;
+  createdByKind: string;
+  createdByName: string | null;
+  status: 'open' | 'resolved';
+  outcome: Outcome | null;
+  resolutionNote: string | null;
+  resolvedAt: number | null;
+  resolvedByName: string | null;
+}
+
+export interface IncidentFilter {
+  status?: 'open' | 'resolved';
+  kind?: IncidentKind;
+  borrowerId?: number;
+  toolId?: number;
+  from?: number;
+  to?: number;
+}
+
+export interface InspectionResult {
+  loan: LoanRow | null;
+  tool: ToolRow;
+  incident: Incident | null;
+}
+
+export interface LoanFilter {
+  toolId?: number;
+  borrowerId?: number;
+  from?: number;
+  to?: number;
+  limit?: number;
 }
 
 export interface Borrower {
@@ -227,6 +357,12 @@ export interface BorrowerPick {
 export interface BorrowerAuth {
   token: string;
   borrower: Borrower;
+}
+
+export interface BorrowerDetail {
+  row: BorrowerRow;
+  loans: LoanRow[];
+  incidents: Incident[];
 }
 
 // ------------------------------------------------------------------ commands
@@ -279,6 +415,28 @@ export const api = {
     call<Borrower>('update_borrower', { id, input, active }),
   setBorrowerPin: (id: number, pin: string) => call<void>('set_borrower_pin', { id, pin }),
   authenticateBorrower: (id: number, pin: string | null) => call<BorrowerAuth>('authenticate_borrower', { id, pin }),
+
+  borrowerDetail: (id: number) => call<BorrowerDetail>('borrower_detail', { id }),
+
+  home: () => call<Home>('home'),
+  resolveScan: (code: string) => call<ScanResult>('resolve_scan', { code }),
+  openLoanForTool: (toolId: number) => call<LoanRow | null>('open_loan_for_tool', { toolId }),
+  checkout: (token: string, items: CheckoutItem[]) => call<CheckoutReceipt>('checkout', { token, items }),
+  reportProblem: (token: string, toolId: number, notes: string, photoId: number | null) =>
+    call<Incident>('report_problem', { token, toolId, notes, photoId }),
+  dropOff: (token: string, checkoutIds: number[], note: string) =>
+    call<LoanRow[]>('drop_off', { token, checkoutIds, note }),
+  inspectReturn: (checkoutId: number, condition: Condition, notes: string, photoId: number | null) =>
+    call<InspectionResult>('inspect_return', { checkoutId, condition, notes, photoId }),
+  inspectTool: (toolId: number, condition: Condition, notes: string, photoId: number | null) =>
+    call<InspectionResult>('inspect_tool', { toolId, condition, notes, photoId }),
+  markLost: (toolId: number, note: string) => call<Incident>('mark_lost', { toolId, note }),
+  markFound: (toolId: number, condition: Condition, notes: string, photoId: number | null) =>
+    call<InspectionResult>('mark_found', { toolId, condition, notes, photoId }),
+  loanHistory: (filter: LoanFilter) => call<LoanRow[]>('loan_history', { filter }),
+  listIncidents: (filter: IncidentFilter) => call<Incident[]>('list_incidents', { filter }),
+  resolveIncident: (id: number, outcome: Outcome, note: string) =>
+    call<Incident>('resolve_incident', { id, outcome, note }),
 
   savePhoto: (data: string) => call<number>('save_photo', { data }),
   getPhoto: (id: number) => call<string>('get_photo', { id }),

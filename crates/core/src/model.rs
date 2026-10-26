@@ -141,6 +141,7 @@ str_enum! {
         Replaced => "replaced", "Replaced";
         BorrowerPaid => "borrower_paid", "Borrower paid";
         Found => "found", "Found";
+        Inspected => "inspected", "Inspected";
         WrittenOff => "written_off", "Written off";
         Other => "other", "Other";
     }
@@ -149,7 +150,7 @@ str_enum! {
 impl Outcome {
     /// Outcomes that clear the borrower: excluded from cost-exposure totals.
     pub fn clears_borrower(self) -> bool {
-        matches!(self, Outcome::NoFault | Outcome::Found)
+        matches!(self, Outcome::NoFault | Outcome::Found | Outcome::Inspected)
     }
 }
 

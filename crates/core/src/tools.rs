@@ -867,6 +867,8 @@ pub(crate) mod tests {
 pub struct ToolDetail {
     pub row: ToolRow,
     pub conditions: Vec<ConditionEvent>,
+    pub loans: Vec<crate::loans::LoanRow>,
+    pub incidents: Vec<crate::incidents::Incident>,
 }
 
 impl crate::Service {
@@ -894,9 +896,26 @@ impl crate::Service {
 
     pub fn tool_detail(&mut self, id: i64) -> Result<ToolDetail> {
         self.require_tech()?;
+        let now = self.now();
         Ok(ToolDetail {
             row: self.tool_row(id)?,
             conditions: condition_history(&self.conn, id)?,
+            loans: crate::loans::history(
+                &self.conn,
+                now,
+                &crate::loans::LoanFilter {
+                    tool_id: Some(id),
+                    limit: Some(200),
+                    ..Default::default()
+                },
+            )?,
+            incidents: crate::incidents::list(
+                &self.conn,
+                &crate::incidents::IncidentFilter {
+                    tool_id: Some(id),
+                    ..Default::default()
+                },
+            )?,
         })
     }
 

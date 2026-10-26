@@ -9,6 +9,8 @@ pub mod borrowers;
 pub mod clock;
 pub mod db;
 pub mod error;
+pub mod incidents;
+pub mod loans;
 pub mod model;
 pub mod paths;
 pub mod photos;

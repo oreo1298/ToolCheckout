@@ -1,18 +1,22 @@
 <script lang="ts">
   // Add or edit a borrower; set/reset their PIN; activate/deactivate.
-  import type { Snippet } from 'svelte';
-  import { api, type Borrower, type BorrowerInput } from '../api';
+  import { api, type Borrower, type BorrowerDetail, type BorrowerInput } from '../api';
   import { app } from '../app.svelte';
   import Avatar from '../components/Avatar.svelte';
   import Icon from '../components/Icon.svelte';
+  import LoanTable from '../components/LoanTable.svelte';
+  import { INCIDENT_KINDS, outcomeLabel } from '../domain';
+  import { dateTime, money } from '../format';
   import Modal from '../components/Modal.svelte';
   import PinCreate from '../components/PinCreate.svelte';
 
-  let {
-    borrower,
-    onclose,
-    extra,
-  }: { borrower: Borrower | null; onclose: () => void; extra?: Snippet } = $props();
+  let { borrower, onclose }: { borrower: Borrower | null; onclose: () => void } = $props();
+
+  let detail = $state<BorrowerDetail | null>(null);
+  $effect(() => {
+    void app.dataVersion;
+    if (borrower) api.borrowerDetail(borrower.id).then((d) => (detail = d), () => {});
+  });
 
   function initial(): BorrowerInput & { active: boolean } {
     return {
@@ -149,7 +153,27 @@
       {/if}
       {#if error}<p class="error-text" role="alert">{error}</p>{/if}
     </form>
-    {#if extra}{@render extra()}{/if}
+    {#if detail}
+      <h3 class="sec">Loans ({detail.loans.length})</h3>
+      <LoanTable loans={detail.loans} show="tool" />
+      <h3 class="sec">Incidents ({detail.incidents.length})</h3>
+      <ul class="incs">
+        {#each detail.incidents as i (i.id)}
+          <li>
+            <span class="badge badge-{INCIDENT_KINDS[i.kind].tone}">{INCIDENT_KINDS[i.kind].label}</span>
+            <span class="grow">
+              {i.toolName} <span class="mono faint">{i.assetTag}</span> · {dateTime(i.createdAt)}
+              {#if i.kind !== 'problem_report' && i.replacementCostCents != null}
+                · {money(i.replacementCostCents, app.settings?.currencySymbol)}
+              {/if}
+            </span>
+            {#if i.status === 'open'}<span class="badge badge-warning">Open</span>{:else}<span class="faint">{outcomeLabel(i.outcome)}</span>{/if}
+          </li>
+        {:else}
+          <li class="muted">None.</li>
+        {/each}
+      </ul>
+    {/if}
   {/if}
   {#snippet footer()}
     {#if step === 'details'}
@@ -171,5 +195,20 @@
   .center {
     text-align: center;
     max-width: 420px;
+  }
+  .sec {
+    margin: 1.2rem 0 0.5rem;
+  }
+  .incs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .incs li {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border);
   }
 </style>

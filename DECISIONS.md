@@ -162,3 +162,44 @@ at the bottom of each group.
   usual borrowers are one tap away without a search.
 * **Borrower list/details are technician-only**; the checkout picker exposes
   only active names (and employee IDs, to tell two "Alex"es apart).
+
+## Loans, returns and incidents
+
+* **Who is the actor.** Checkout, problem reports and drop-offs are recorded
+  with the *borrower* as actor (they proved it with their PIN). Inspections,
+  lost/found and incident resolution are recorded with the *technician*. When
+  a technician had to authorize a checkout (tech-only tool, or "require tech
+  PIN" setting), their name is stored on the loan and in the audit entry.
+* **Tech-only tools** can't be checked out by a borrower alone; a technician
+  can authorize the loan with their PIN (recorded), rather than the tool being
+  impossible to lend at all.
+* **Checkout is all-or-nothing**: if any tool in the cart is no longer
+  available, nothing is lent. One row per tool, grouped by a batch id.
+* **The checkout itself is the condition confirmation.** The tool's condition
+  at that moment is stored on the loan (`checkout_condition`) and in the audit
+  entry as `conditionConfirmed`.
+* **Overdue** means `now > due_at` while the tool is still out. A dropped-off
+  tool is no longer overdue; its lateness is fixed at the drop-off time, and
+  the inspection keeps that return time.
+* **Damage incident** is opened automatically when the inspected condition is
+  worse than the checkout condition (rank comparison New < … < Broken).
+  Damaged/Broken returns go to "Out for repair".
+* **Problem reports** are stored as incidents of kind `problem_report` (with
+  the reporter as borrower, not at fault). The tool goes to "awaiting
+  inspection"; the inspection resolves the report automatically (outcome
+  "Inspected"). If the inspection finds it worse than its recorded condition,
+  a damage incident is opened *without* a borrower: the tool was damaged
+  between loans, after a technician last recorded its condition, so pinning it
+  on the previous borrower would be unfair. The notes name the last borrower
+  for context.
+* **Lost:** a technician can mark a tool lost from any active status; if it
+  was on loan the Lost incident names the borrower and the loan is closed as
+  lost. **Found** resolves open Lost incidents ("Found") and, if the tool came
+  back worse than when it was lent, opens a damage incident against that
+  borrower.
+* **Scan resolution order:** tool tag first, then borrower badge, then
+  employee ID. Typing a tag and pressing Enter anywhere on the home screen
+  works exactly like a scan (keyboard-only use).
+* **Scan capture ignores text fields** (so typing notes never triggers an
+  action) and only one screen listens at a time (sheets and dialogs on top
+  silence the home screen's listener).

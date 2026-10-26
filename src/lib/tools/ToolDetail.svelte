@@ -8,7 +8,10 @@
   import Photo from '../components/Photo.svelte';
   import ReasonDialog from '../components/ReasonDialog.svelte';
   import StatusBadge from '../components/StatusBadge.svelte';
-  import { CONDITION_SOURCES } from '../domain';
+  import LoanTable from '../components/LoanTable.svelte';
+  import { CONDITION_SOURCES, INCIDENT_KINDS, outcomeLabel } from '../domain';
+  import InspectForm from '../flows/InspectForm.svelte';
+  import type { Condition } from '../api';
   import { dateTime, dueLabel, loanPeriod, money, when } from '../format';
   import ConditionDialog from './ConditionDialog.svelte';
   import ToolForm from './ToolForm.svelte';
@@ -17,8 +20,28 @@
 
   let detail = $state<ToolDetail | null>(null);
   let dialog = $state<
-    null | 'edit' | 'duplicate' | 'condition' | 'repair-out' | 'repair-back' | 'retire' | 'reinstate'
+    null | 'edit' | 'duplicate' | 'condition' | 'repair-out' | 'repair-back' | 'retire' | 'reinstate' | 'lost' | 'found'
   >(null);
+  let tab = $state<'loans' | 'conditions' | 'incidents'>('loans');
+  let found = $state<{ condition: Condition | null; notes: string; photoId: number | null; error: string | null }>({
+    condition: null,
+    notes: '',
+    photoId: null,
+    error: null,
+  });
+
+  async function markFound() {
+    if (!found.condition) return void (found.error = 'Choose a condition');
+    try {
+      const r = await app.withTech(() => api.markFound(id, found.condition!, found.notes, found.photoId));
+      if (r) {
+        app.toast(r.incident ? 'Marked found. It came back worse, so a damage incident was opened.' : 'Marked found');
+        dialog = null;
+      }
+    } catch (e) {
+      found.error = (e as { message: string }).message;
+    }
+  }
 
   $effect(() => {
     void app.dataVersion;
@@ -96,9 +119,42 @@
       {#if t.status === 'retired'}
         <button class="btn btn-sm" onclick={() => (dialog = 'reinstate')}><Icon name="refresh" size={16} /> Reinstate</button>
       {/if}
+      {#if ['available', 'checked_out', 'awaiting_inspection', 'out_for_repair'].includes(t.status)}
+        <button class="btn btn-sm danger-text" onclick={() => (dialog = 'lost')}><Icon name="alert" size={16} /> Mark lost</button>
+      {/if}
+      {#if t.status === 'lost'}
+        <button class="btn btn-sm" onclick={() => ((dialog = 'found'), (found = { condition: null, notes: '', photoId: null, error: null }))}>
+          <Icon name="check" size={16} /> Mark found
+        </button>
+      {/if}
     </div>
 
-    <h3>Condition history</h3>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected={tab === 'loans'} class:on={tab === 'loans'} onclick={() => (tab = 'loans')}>Loans ({detail.loans.length})</button>
+      <button role="tab" aria-selected={tab === 'conditions'} class:on={tab === 'conditions'} onclick={() => (tab = 'conditions')}>Condition history ({detail.conditions.length})</button>
+      <button role="tab" aria-selected={tab === 'incidents'} class:on={tab === 'incidents'} onclick={() => (tab = 'incidents')}>Incidents ({detail.incidents.length})</button>
+    </div>
+
+    {#if tab === 'loans'}
+      <LoanTable loans={detail.loans} show="borrower" />
+    {:else if tab === 'incidents'}
+      <ul class="incs">
+        {#each detail.incidents as i (i.id)}
+          <li>
+            <span class="badge badge-{INCIDENT_KINDS[i.kind].tone}">{INCIDENT_KINDS[i.kind].label}</span>
+            <span class="grow">
+              {i.borrowerName ?? 'Unattributed'} · {dateTime(i.createdAt)}
+              {#if i.notes}<span class="muted"> · “{i.notes}”</span>{/if}
+            </span>
+            {#if i.status === 'open'}<span class="badge badge-warning">Open</span>{:else}<span class="faint">{outcomeLabel(i.outcome)}</span>{/if}
+          </li>
+        {:else}
+          <li class="muted">No incidents.</li>
+        {/each}
+      </ul>
+    {/if}
+
+    {#if tab === 'conditions'}
     <ol class="timeline">
       {#each detail.conditions as ev (ev.id)}
         <li>
@@ -116,6 +172,7 @@
         </li>
       {/each}
     </ol>
+    {/if}
   {:else}
     <p class="muted">Loading…</p>
   {/if}
@@ -147,6 +204,27 @@
     onclose={() => (dialog = null)}
     onsubmit={(r) => act(() => api.sendToolToRepair(t.id, r), `${t.name} is out for repair`)}
   />
+{:else if t && dialog === 'lost'}
+  <ReasonDialog
+    title="Mark {t.assetTag} lost"
+    label="Where was it last seen?"
+    message={t.borrowerName
+      ? `It's on loan to ${t.borrowerName}. A Lost incident will be opened against them.`
+      : 'A Lost incident will be opened.'}
+    confirm="Mark lost"
+    danger
+    onclose={() => (dialog = null)}
+    onsubmit={(r) => act(() => api.markLost(t.id, r), `${t.name} marked lost`)}
+  />
+{:else if t && dialog === 'found'}
+  <Modal title="Found {t.assetTag}" size="lg" onclose={() => (dialog = null)}>
+    <InspectForm before={t.condition} beforeLabel="when lost" borrowerName={null} bind:condition={found.condition} bind:notes={found.notes} bind:photoId={found.photoId} />
+    {#if found.error}<p class="error-text">{found.error}</p>{/if}
+    {#snippet footer()}
+      <button class="btn" onclick={() => (dialog = null)}>Cancel</button>
+      <button class="btn btn-primary" onclick={markFound}>Mark found</button>
+    {/snippet}
+  </Modal>
 {:else if t && dialog === 'retire'}
   <ReasonDialog
     title="Retire {t.assetTag}"
@@ -206,8 +284,41 @@
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
-  h3 {
-    margin-bottom: 0.5rem;
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs button {
+    min-height: 44px;
+    padding: 0 1rem;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .tabs button.on {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+  .incs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .incs li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .danger-text {
+    color: var(--danger);
   }
   .timeline {
     list-style: none;

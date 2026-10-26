@@ -47,8 +47,8 @@ export function when(ms: number, now = Date.now()): string {
   const d = new Date(ms);
   const n = new Date(now);
   if (sameDay(d, n)) return time(ms);
-  const yesterday = new Date(now - DAY);
-  if (sameDay(d, yesterday)) return `Yesterday ${time(ms)}`;
+  if (sameDay(d, new Date(now - DAY))) return `Yesterday ${time(ms)}`;
+  if (sameDay(d, new Date(now + DAY))) return `Tomorrow ${time(ms)}`;
   if (Math.abs(now - ms) < 6 * DAY) {
     return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${time(ms)}`;
   }

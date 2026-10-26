@@ -4,7 +4,12 @@
   import Toasts from './lib/components/Toasts.svelte';
   import { countdown } from './lib/format';
   import UnlockDialog from './lib/flows/UnlockDialog.svelte';
+  import CheckoutSheet from './lib/flows/CheckoutSheet.svelte';
+  import InspectSheet from './lib/flows/InspectSheet.svelte';
+  import ReturnSheet from './lib/flows/ReturnSheet.svelte';
   import Borrowers from './lib/screens/Borrowers.svelte';
+  import Home from './lib/screens/Home.svelte';
+  import Incidents from './lib/screens/Incidents.svelte';
   import Settings from './lib/screens/Settings.svelte';
   import Setup from './lib/screens/Setup.svelte';
   import Tools from './lib/screens/Tools.svelte';
@@ -87,8 +92,12 @@
     </nav>
 
     <main class="content">
-      {#if app.screen === 'settings'}
+      {#if app.screen === 'home'}
+        <Home />
+      {:else if app.screen === 'settings'}
         <Settings />
+      {:else if app.screen === 'incidents'}
+        <Incidents />
       {:else if app.screen === 'tools'}
         <Tools />
       {:else if app.screen === 'borrowers'}
@@ -101,6 +110,13 @@
   </div>
 {/if}
 
+{#if app.flow?.kind === 'checkout'}
+  <CheckoutSheet tools={app.flow.tools} borrower={app.flow.borrower} onclose={() => (app.flow = null)} />
+{:else if app.flow?.kind === 'return'}
+  <ReturnSheet loans={app.flow.loans} onclose={() => (app.flow = null)} />
+{:else if app.flow?.kind === 'inspect'}
+  <InspectSheet item={app.flow.item} onclose={() => (app.flow = null)} />
+{/if}
 {#if app.toolDetailId !== null && app.session}
   {#key app.toolDetailId}
     <ToolDetail id={app.toolDetailId} onclose={() => (app.toolDetailId = null)} />

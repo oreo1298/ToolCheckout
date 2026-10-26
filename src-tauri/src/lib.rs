@@ -67,6 +67,20 @@ pub fn run() {
             commands::update_borrower,
             commands::set_borrower_pin,
             commands::authenticate_borrower,
+            commands::borrower_detail,
+            commands::home,
+            commands::resolve_scan,
+            commands::open_loan_for_tool,
+            commands::checkout,
+            commands::report_problem,
+            commands::drop_off,
+            commands::inspect_return,
+            commands::inspect_tool,
+            commands::mark_lost,
+            commands::mark_found,
+            commands::loan_history,
+            commands::list_incidents,
+            commands::resolve_incident,
         ])
         .setup(move |app| {
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())

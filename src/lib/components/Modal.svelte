@@ -24,9 +24,16 @@
   } = $props();
 
   let el: HTMLDialogElement;
+  let frame: HTMLDivElement;
+  let closeBtn = $state<HTMLButtonElement>();
 
   $effect(() => {
     el.showModal();
+    // The browser focuses the first focusable element (often ✕), where a
+    // stray Enter or a scanner's Enter would close the dialog. Focus the
+    // dialog itself unless a field asked for focus.
+    const a = document.activeElement;
+    if (!el.contains(a) || a === closeBtn) frame.focus({ preventScroll: true });
     return () => el.open && el.close();
   });
 
@@ -42,11 +49,11 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
 <dialog bind:this={el} class="modal {size}" oncancel={cancel} onclick={backdrop} aria-label={title}>
-  <div class="frame">
+  <div class="frame" bind:this={frame} tabindex="-1">
     <header>
       <h2>{title}</h2>
       {#if dismissible}
-        <button class="btn btn-ghost btn-icon" onclick={onclose} aria-label="Close">
+        <button class="btn btn-ghost btn-icon" bind:this={closeBtn} onclick={onclose} aria-label="Close">
           <Icon name="x" />
         </button>
       {/if}
@@ -85,6 +92,7 @@
     background: var(--scrim);
   }
   .frame {
+    outline: none;
     display: flex;
     flex-direction: column;
     max-height: calc(100vh - 48px);

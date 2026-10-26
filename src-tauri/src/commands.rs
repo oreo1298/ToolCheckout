@@ -366,3 +366,143 @@ pub fn authenticate_borrower(
 ) -> CmdResult<BorrowerAuth> {
     read(&state, |s| s.authenticate_borrower(id, pin.as_deref()))
 }
+
+// ---------------------------------------------------------------- loans & incidents
+
+use toolcheckout_core::borrowers::BorrowerDetail;
+use toolcheckout_core::incidents::{Incident, IncidentFilter};
+use toolcheckout_core::loans::{
+    CheckoutItem, CheckoutReceipt, Home, InspectionResult, LoanFilter, LoanRow, ScanResult,
+};
+use toolcheckout_core::model::Outcome;
+
+#[tauri::command(async)]
+pub fn home(state: State<'_, AppState>) -> CmdResult<Home> {
+    read(&state, |s| s.home())
+}
+
+#[tauri::command(async)]
+pub fn resolve_scan(state: State<'_, AppState>, code: String) -> CmdResult<ScanResult> {
+    read(&state, |s| s.resolve_scan(&code))
+}
+
+#[tauri::command(async)]
+pub fn open_loan_for_tool(state: State<'_, AppState>, tool_id: i64) -> CmdResult<Option<LoanRow>> {
+    read(&state, |s| s.open_loan_for_tool(tool_id))
+}
+
+#[tauri::command(async)]
+pub fn checkout(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    token: String,
+    items: Vec<CheckoutItem>,
+) -> CmdResult<CheckoutReceipt> {
+    write(&app, &state, |s| s.checkout(&token, &items))
+}
+
+#[tauri::command(async)]
+pub fn report_problem(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    token: String,
+    tool_id: i64,
+    notes: String,
+    photo_id: Option<i64>,
+) -> CmdResult<Incident> {
+    write(&app, &state, |s| {
+        s.report_problem(&token, tool_id, &notes, photo_id)
+    })
+}
+
+#[tauri::command(async)]
+pub fn drop_off(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    token: String,
+    checkout_ids: Vec<i64>,
+    note: String,
+) -> CmdResult<Vec<LoanRow>> {
+    write(&app, &state, |s| s.drop_off(&token, &checkout_ids, &note))
+}
+
+#[tauri::command(async)]
+pub fn inspect_return(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    checkout_id: i64,
+    condition: Condition,
+    notes: String,
+    photo_id: Option<i64>,
+) -> CmdResult<InspectionResult> {
+    write(&app, &state, |s| {
+        s.inspect_return(checkout_id, condition, &notes, photo_id)
+    })
+}
+
+#[tauri::command(async)]
+pub fn inspect_tool(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    tool_id: i64,
+    condition: Condition,
+    notes: String,
+    photo_id: Option<i64>,
+) -> CmdResult<InspectionResult> {
+    write(&app, &state, |s| {
+        s.inspect_tool(tool_id, condition, &notes, photo_id)
+    })
+}
+
+#[tauri::command(async)]
+pub fn mark_lost(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    tool_id: i64,
+    note: String,
+) -> CmdResult<Incident> {
+    write(&app, &state, |s| s.mark_lost(tool_id, &note))
+}
+
+#[tauri::command(async)]
+pub fn mark_found(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    tool_id: i64,
+    condition: Condition,
+    notes: String,
+    photo_id: Option<i64>,
+) -> CmdResult<InspectionResult> {
+    write(&app, &state, |s| {
+        s.mark_found(tool_id, condition, &notes, photo_id)
+    })
+}
+
+#[tauri::command(async)]
+pub fn loan_history(state: State<'_, AppState>, filter: LoanFilter) -> CmdResult<Vec<LoanRow>> {
+    read(&state, |s| s.loan_history(&filter))
+}
+
+#[tauri::command(async)]
+pub fn list_incidents(
+    state: State<'_, AppState>,
+    filter: IncidentFilter,
+) -> CmdResult<Vec<Incident>> {
+    read(&state, |s| s.list_incidents(&filter))
+}
+
+#[tauri::command(async)]
+pub fn resolve_incident(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    outcome: Outcome,
+    note: String,
+) -> CmdResult<Incident> {
+    write(&app, &state, |s| s.resolve_incident(id, outcome, &note))
+}
+
+#[tauri::command(async)]
+pub fn borrower_detail(state: State<'_, AppState>, id: i64) -> CmdResult<BorrowerDetail> {
+    read(&state, |s| s.borrower_detail(id))
+}

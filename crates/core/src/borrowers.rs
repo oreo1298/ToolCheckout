@@ -358,7 +358,50 @@ pub struct BorrowerAuth {
     pub borrower: Borrower,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BorrowerDetail {
+    pub row: BorrowerRow,
+    pub loans: Vec<crate::loans::LoanRow>,
+    pub incidents: Vec<crate::incidents::Incident>,
+}
+
 impl crate::Service {
+    pub fn borrower_detail(&mut self, id: i64) -> Result<BorrowerDetail> {
+        self.require_tech()?;
+        let now = self.now();
+        let row = list(
+            &self.conn,
+            now,
+            &BorrowerFilter {
+                include_inactive: true,
+                ..Default::default()
+            },
+        )?
+        .into_iter()
+        .find(|r| r.borrower.id == id)
+        .ok_or_else(|| not_found("Borrower"))?;
+        Ok(BorrowerDetail {
+            row,
+            loans: crate::loans::history(
+                &self.conn,
+                now,
+                &crate::loans::LoanFilter {
+                    borrower_id: Some(id),
+                    limit: Some(200),
+                    ..Default::default()
+                },
+            )?,
+            incidents: crate::incidents::list(
+                &self.conn,
+                &crate::incidents::IncidentFilter {
+                    borrower_id: Some(id),
+                    ..Default::default()
+                },
+            )?,
+        })
+    }
+
     /// Names for the checkout picker (public).
     pub fn borrower_picker(&self) -> Result<Vec<BorrowerPick>> {
         picker(&self.conn, self.now())
@@ -413,7 +456,6 @@ impl crate::Service {
     }
 
     /// The borrower behind a still-valid confirmation token.
-    #[allow(dead_code)] // TEMP: used by checkout/drop-off in the loans milestone
     pub(crate) fn borrower_from_token(&self, token: &str) -> Result<Borrower> {
         let id = self.sessions.borrower_for_token(token, self.now())?;
         let b = get(&self.conn, id)?;

@@ -126,6 +126,7 @@ a {
 }
 .mono {
   font-family: var(--mono);
+  white-space: nowrap;
 }
 .nowrap {
   white-space: nowrap;

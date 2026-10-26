@@ -1,5 +1,5 @@
 // Display metadata for domain enums.
-import type { Condition, ConditionSource, ToolStatus } from './api';
+import type { Condition, ConditionSource, IncidentKind, Outcome, ToolStatus } from './api';
 
 export const CONDITIONS: { value: Condition; label: string; hint: string; tone: Tone }[] = [
   { value: 'new', label: 'New', hint: 'Unused, like out of the box', tone: 'success' },
@@ -45,3 +45,23 @@ export const LOAN_PRESETS: { minutes: number; label: string }[] = [
   { minutes: 4320, label: '3 days' },
   { minutes: 10080, label: '1 week' },
 ];
+
+export const INCIDENT_KINDS: Record<IncidentKind, { label: string; tone: Tone }> = {
+  damage: { label: 'Damage', tone: 'danger' },
+  lost: { label: 'Lost', tone: 'danger' },
+  problem_report: { label: 'Problem reported', tone: 'warning' },
+};
+
+export const OUTCOMES: { value: Outcome; label: string }[] = [
+  { value: 'no_fault', label: 'Normal wear – no fault' },
+  { value: 'borrower_damaged', label: 'Damaged by borrower' },
+  { value: 'repaired', label: 'Repaired' },
+  { value: 'replaced', label: 'Replaced' },
+  { value: 'borrower_paid', label: 'Borrower paid' },
+  { value: 'found', label: 'Found' },
+  { value: 'inspected', label: 'Inspected' },
+  { value: 'written_off', label: 'Written off' },
+  { value: 'other', label: 'Other' },
+];
+
+export const outcomeLabel = (o: Outcome | null) => OUTCOMES.find((x) => x.value === o)?.label ?? '—';

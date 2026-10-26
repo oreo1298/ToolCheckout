@@ -1,4 +1,4 @@
-import { countdown, dueLabel, duration, initials, loanPeriod, money, parseMoney, todayAt } from './format';
+import { countdown, dueLabel, duration, initials, loanPeriod, money, parseMoney, todayAt, when } from './format';
 
 const MIN = 60_000;
 
@@ -28,6 +28,15 @@ describe('money', () => {
     expect(parseMoney('  ')).toBeNull();
     expect(parseMoney('abc')).toBeNull();
     expect(parseMoney('12,99')).toBe(1299);
+  });
+});
+
+describe('when', () => {
+  it('names nearby days', () => {
+    const noon = new Date(2026, 0, 5, 12, 0).getTime();
+    expect(when(noon + 60 * MIN, noon)).not.toMatch(/day/);
+    expect(when(noon + 24 * 60 * MIN, noon)).toMatch(/^Tomorrow/);
+    expect(when(noon - 24 * 60 * MIN, noon)).toMatch(/^Yesterday/);
   });
 });
 
