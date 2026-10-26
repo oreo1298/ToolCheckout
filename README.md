@@ -230,14 +230,16 @@ sudo dnf install gcc pkgconf-pkg-config curl git \
 
 ##### RHEL, AlmaLinux, Rocky Linux 10
 
-The WebKitGTK development files are in the CodeReady Builder (CRB)
-repository. On RHEL itself, enable it with
+The WebKitGTK 4.1 development files come from EPEL, which also needs the
+CodeReady Builder (CRB) repository. On RHEL itself, install EPEL with
+`sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm`
+and enable CRB with
 `sudo subscription-manager repos --enable codeready-builder-for-rhel-10-x86_64-rpms`
-instead of the `config-manager` line.
+instead of the first two lines.
 
 <!-- ci-linux: deps-rhel -->
 ```sh
-sudo dnf install dnf-plugins-core
+sudo dnf install dnf-plugins-core epel-release
 sudo dnf config-manager --set-enabled crb
 sudo dnf install gcc pkgconf-pkg-config curl git \
   webkit2gtk4.1-devel dbus-devel

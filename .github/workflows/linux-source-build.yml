@@ -96,18 +96,6 @@ jobs:
 
       - uses: actions/checkout@v5
 
-      # Temporary: find out where RHEL-family distributions keep WebKitGTK 4.1.
-      - name: Diagnose WebKitGTK availability
-        if: matrix.name == 'AlmaLinux 10'
-        continue-on-error: true
-        shell: sh
-        run: |
-          dnf install -y dnf-plugins-core epel-release
-          dnf config-manager --set-enabled crb
-          dnf repolist
-          dnf repoquery --available --whatprovides 'pkgconfig(webkit2gtk-4.1)' 'pkgconfig(javascriptcoregtk-4.1)' 'pkgconfig(webkitgtk-6.0)'
-          dnf repoquery --available 'webkit*' 'libwebkit*' | sort -u
-
       - name: Run the README's commands
         shell: sh
         run: |
