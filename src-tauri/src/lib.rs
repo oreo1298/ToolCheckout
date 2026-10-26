@@ -4,6 +4,7 @@
 
 mod appearance;
 mod commands;
+mod reminders;
 mod state;
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
@@ -81,6 +82,11 @@ pub fn run() {
             commands::loan_history,
             commands::list_incidents,
             commands::resolve_incident,
+            commands::report_borrowers,
+            commands::report_tools,
+            commands::report_loans,
+            commands::report_incidents,
+            commands::export_report_csv,
         ])
         .setup(move |app| {
             let mut win = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
@@ -93,6 +99,7 @@ pub fn run() {
             }
             win.build()?;
             appearance::start(app.handle().clone());
+            reminders::start(app.handle().clone());
             Ok(())
         })
         .run(tauri::generate_context!())

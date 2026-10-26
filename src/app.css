@@ -384,8 +384,9 @@ textarea.input {
   color: var(--text-faint);
 }
 
-/* Print: only .print-area is printed. */
-.print-only {
+/* Print: printWith() mounts the printable content in .print-root at the end
+   of <body>; while printing, everything else is hidden. */
+.print-root {
   display: none;
 }
 @media print {
@@ -394,27 +395,23 @@ textarea.input {
     --bg: #fff;
     --surface: #fff;
     --surface-2: #f3f3f3;
+    --surface-3: #e8e8e8;
     --text: #000;
     --text-muted: #333;
+    --text-faint: #555;
     --border: #bbb;
     color-scheme: light;
   }
-  body * {
-    visibility: hidden;
+  html,
+  body {
+    background: #fff !important;
+    height: auto;
   }
-  .print-area,
-  .print-area * {
-    visibility: visible;
-  }
-  .print-area {
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
-  }
-  .print-only {
-    display: block;
-  }
-  .no-print {
+  body.printing > :not(.print-root),
+  body.printing dialog {
     display: none !important;
+  }
+  body.printing > .print-root {
+    display: block;
   }
 }

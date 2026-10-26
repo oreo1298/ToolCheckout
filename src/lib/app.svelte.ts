@@ -72,6 +72,9 @@ class AppStore {
       this.dataVersion++;
       void this.refreshStatus();
     });
+    // Overdue / end-of-day reminders also appear in the app, in case OS
+    // notifications are switched off.
+    await listen<{ title: string }>('reminder', (e) => this.toast(e.payload.title, 'info'));
     setInterval(() => this.tick(), 1000);
     const onActivity = () => this.activity();
     window.addEventListener('pointerdown', onActivity, { passive: true });

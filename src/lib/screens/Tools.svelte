@@ -8,6 +8,7 @@
   import TechGate from '../components/TechGate.svelte';
   import { STATUSES } from '../domain';
   import ToolForm from '../tools/ToolForm.svelte';
+  import LabelsDialog from '../labels/LabelsDialog.svelte';
 
   let search = $state('');
   let status = $state<ToolStatus | ''>('');
@@ -15,6 +16,7 @@
   let rows = $state<ToolRow[]>([]);
   let categories = $state<string[]>([]);
   let adding = $state(false);
+  let labels = $state(false);
 
   $effect(() => {
     void app.dataVersion;
@@ -35,6 +37,7 @@
   <div class="page">
     <div class="row wrap head">
       <h1 class="grow">Tools</h1>
+      <button class="btn" onclick={() => (labels = true)}><Icon name="tag" /> Print labels</button>
       <button class="btn btn-primary" onclick={() => (adding = true)}><Icon name="plus" /> Add tool</button>
     </div>
 
@@ -89,6 +92,10 @@
     </div>
   </div>
 </TechGate>
+
+{#if labels}
+  <LabelsDialog onclose={() => (labels = false)} />
+{/if}
 
 {#if adding}
   <ToolForm

@@ -203,3 +203,40 @@ at the bottom of each group.
 * **Scan capture ignores text fields** (so typing notes never triggers an
   action) and only one screen listens at a time (sheets and dialogs on top
   silence the home screen's listener).
+
+## Overdue, reports, printing, labels
+
+* **Notifications** are scheduled by pure, unit-tested core logic and
+  delivered by a background thread every 30 s through the notification plugin
+  (Windows toast / freedesktop D-Bus on Linux, verified with `dbus-monitor`).
+  Rules: one notification when loans go overdue (batched), a "still overdue"
+  summary every N minutes (Settings, default 60), never two overdue
+  notifications within 5 minutes, and an end-of-day summary once per day at
+  closing time (default 17:30) if anything is still out. The same messages
+  appear as in-app toasts (in case OS notifications are disabled), and the
+  home screen shows an end-of-day banner after closing time.
+* **Reports** are computed in the backend. "Late return" = returned
+  (inspected or dropped off) after the due time; average lateness is over late
+  returns only. "Cost of damaged/lost" sums replacement cost of damage/lost
+  incidents attributed to the borrower, except those resolved as *no fault*,
+  *found* or *inspected*. Date filters apply to checkout time for loans and to
+  creation time for incidents; the open-incidents report ignores the date
+  range (an open incident matters however old it is).
+* **CSV export** is built in Rust and saved through the native save dialog:
+  UTF-8 with BOM and CRLF so Excel opens it correctly, and cells starting with
+  `= + - @` are prefixed with `'` (CSV/formula injection), except plain
+  negative numbers.
+* **Printing** uses the system print dialog (`window.print()`; "Save as PDF"
+  covers PDF export). The printable content is mounted in its own root at the
+  end of `<body>` and everything else is hidden, so dialogs never end up in
+  the printout. Tauri's Rust-side `print()` only works on macOS, so it isn't
+  used.
+* **Labels**: Code 128 via JsBarcode (what USB scanners read), optional QR
+  via `qrcode`. Stocks: Avery 5160/8160, 5167, L7160, L7651, with "skip used
+  labels" for partial sheets and an outline mode for test prints. Verified by
+  printing to PDF under WebKitGTK and decoding the barcode from the PDF with
+  `zbarimg`. **WebKitGTK ignores CSS `@page` size and margins** and applies
+  GTK's default 0.25″ margins (measured), so the label dialog has a per-PC
+  position calibration (mm), defaulting to −6.35 mm on Linux and 0 on Windows
+  (WebView2 honours `@page`). The page box is sized to end just past the last
+  label so uneven engine margins can't push out a blank page.

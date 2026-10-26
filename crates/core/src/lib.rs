@@ -7,6 +7,7 @@
 pub mod audit;
 pub mod borrowers;
 pub mod clock;
+pub mod csv;
 pub mod db;
 pub mod error;
 pub mod incidents;
@@ -15,6 +16,8 @@ pub mod model;
 pub mod paths;
 pub mod photos;
 pub mod pin;
+pub mod reminders;
+pub mod reports;
 pub mod service;
 pub mod session;
 pub mod settings;

@@ -365,6 +365,46 @@ export interface BorrowerDetail {
   incidents: Incident[];
 }
 
+export interface ReportFilter {
+  from?: number;
+  to?: number;
+  borrowerId?: number;
+  toolId?: number;
+}
+
+export interface BorrowerSummary {
+  borrowerId: number;
+  name: string;
+  checkouts: number;
+  returned: number;
+  lateReturns: number;
+  avgLateMs: number | null;
+  currentlyOut: number;
+  currentlyOverdue: number;
+  damageIncidents: number;
+  lostTools: number;
+  problemsReported: number;
+  costExposureCents: number;
+}
+
+export interface ToolSummary {
+  toolId: number;
+  assetTag: string;
+  name: string;
+  category: string;
+  status: ToolStatus | null;
+  condition: Condition | null;
+  replacementCostCents: number | null;
+  checkouts: number;
+  lateReturns: number;
+  timeOutMs: number;
+  damageIncidents: number;
+  lostIncidents: number;
+  problemReports: number;
+}
+
+export type ReportKind = 'borrowers' | 'tools' | 'loans' | 'incidents' | 'open_incidents';
+
 // ------------------------------------------------------------------ commands
 
 export const api = {
@@ -437,6 +477,14 @@ export const api = {
   listIncidents: (filter: IncidentFilter) => call<Incident[]>('list_incidents', { filter }),
   resolveIncident: (id: number, outcome: Outcome, note: string) =>
     call<Incident>('resolve_incident', { id, outcome, note }),
+
+  reportBorrowers: (filter: ReportFilter) => call<BorrowerSummary[]>('report_borrowers', { filter }),
+  reportTools: (filter: ReportFilter) => call<ToolSummary[]>('report_tools', { filter }),
+  reportLoans: (filter: ReportFilter) => call<LoanRow[]>('report_loans', { filter }),
+  reportIncidents: (filter: ReportFilter, openOnly: boolean) =>
+    call<Incident[]>('report_incidents', { filter, openOnly }),
+  exportReportCsv: (kind: ReportKind, filter: ReportFilter, fileName: string) =>
+    call<string | null>('export_report_csv', { kind, filter, fileName }),
 
   savePhoto: (data: string) => call<number>('save_photo', { data }),
   getPhoto: (id: number) => call<string>('get_photo', { id }),

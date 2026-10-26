@@ -15,12 +15,13 @@
   import { dateTime, dueLabel, loanPeriod, money, when } from '../format';
   import ConditionDialog from './ConditionDialog.svelte';
   import ToolForm from './ToolForm.svelte';
+  import LabelsDialog from '../labels/LabelsDialog.svelte';
 
   let { id, onclose }: { id: number; onclose: () => void } = $props();
 
   let detail = $state<ToolDetail | null>(null);
   let dialog = $state<
-    null | 'edit' | 'duplicate' | 'condition' | 'repair-out' | 'repair-back' | 'retire' | 'reinstate' | 'lost' | 'found'
+    null | 'edit' | 'duplicate' | 'condition' | 'repair-out' | 'repair-back' | 'retire' | 'reinstate' | 'lost' | 'found' | 'label'
   >(null);
   let tab = $state<'loans' | 'conditions' | 'incidents'>('loans');
   let found = $state<{ condition: Condition | null; notes: string; photoId: number | null; error: string | null }>({
@@ -104,6 +105,7 @@
     <div class="actions row wrap">
       <button class="btn btn-sm" onclick={() => (dialog = 'edit')}><Icon name="edit" size={16} /> Edit</button>
       <button class="btn btn-sm" onclick={() => (dialog = 'duplicate')}><Icon name="copy" size={16} /> Duplicate</button>
+      <button class="btn btn-sm" onclick={() => (dialog = 'label')}><Icon name="tag" size={16} /> Print label</button>
       {#if t.status === 'available' || t.status === 'out_for_repair'}
         <button class="btn btn-sm" onclick={() => (dialog = 'condition')}><Icon name="inspect" size={16} /> Update condition</button>
       {/if}
@@ -178,7 +180,9 @@
   {/if}
 </Modal>
 
-{#if t && dialog === 'edit'}
+{#if t && dialog === 'label'}
+  <LabelsDialog preselect={[t.id]} onclose={() => (dialog = null)} />
+{:else if t && dialog === 'edit'}
   <ToolForm mode="edit" source={t} onclose={() => (dialog = null)} onsaved={() => (dialog = null)} />
 {:else if t && dialog === 'duplicate'}
   <ToolForm

@@ -115,6 +115,17 @@
   }
 
   const overdueCount = $derived(home?.overdue.length ?? 0);
+
+  // After closing time, remind whoever is at the counter what's still out.
+  const pastClosing = $derived.by(() => {
+    const s = app.settings;
+    if (!s?.endOfDayReminder) return false;
+    const [h, m] = s.closingTime.split(':').map(Number);
+    const closing = new Date(app.nowMs);
+    closing.setHours(h, m, 0, 0);
+    return app.nowMs >= closing.getTime();
+  });
+  const stillOut = $derived(home ? [...home.overdue, ...home.out] : []);
 </script>
 
 <div class="home">
@@ -165,6 +176,16 @@
   </div>
 
   {#if home}
+    {#if pastClosing && stillOut.length}
+      <div class="eod" role="status">
+        <Icon name="bell" />
+        <span>
+          <strong>End of day:</strong>
+          {stillOut.length} {stillOut.length === 1 ? 'tool is' : 'tools are'} still out —
+          {[...new Set(stillOut.map((l) => l.borrowerName))].join(', ')}.
+        </span>
+      </div>
+    {/if}
     {#if overdueCount}
       <section class="panel overdue" aria-labelledby="ov-h">
         <h2 id="ov-h"><Icon name="alert" /> Overdue <span class="count">{overdueCount}</span></h2>
@@ -331,6 +352,15 @@
   }
   .hits button:hover {
     background: var(--surface-2);
+  }
+  .eod {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-lg);
+    background: var(--warning-soft);
+    border: 1px solid var(--warning);
   }
   .panels {
     display: grid;

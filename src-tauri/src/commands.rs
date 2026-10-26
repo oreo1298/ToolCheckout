@@ -506,3 +506,69 @@ pub fn resolve_incident(
 pub fn borrower_detail(state: State<'_, AppState>, id: i64) -> CmdResult<BorrowerDetail> {
     read(&state, |s| s.borrower_detail(id))
 }
+
+// ---------------------------------------------------------------- reports
+
+use tauri_plugin_dialog::DialogExt;
+use toolcheckout_core::reports::{BorrowerSummary, ReportFilter, ToolSummary};
+
+#[tauri::command(async)]
+pub fn report_borrowers(
+    state: State<'_, AppState>,
+    filter: ReportFilter,
+) -> CmdResult<Vec<BorrowerSummary>> {
+    read(&state, |s| s.report_borrowers(&filter))
+}
+
+#[tauri::command(async)]
+pub fn report_tools(
+    state: State<'_, AppState>,
+    filter: ReportFilter,
+) -> CmdResult<Vec<ToolSummary>> {
+    read(&state, |s| s.report_tools(&filter))
+}
+
+#[tauri::command(async)]
+pub fn report_loans(state: State<'_, AppState>, filter: ReportFilter) -> CmdResult<Vec<LoanRow>> {
+    read(&state, |s| s.report_loans(&filter))
+}
+
+#[tauri::command(async)]
+pub fn report_incidents(
+    state: State<'_, AppState>,
+    filter: ReportFilter,
+    open_only: bool,
+) -> CmdResult<Vec<Incident>> {
+    read(&state, |s| s.report_incidents(&filter, open_only))
+}
+
+/// Builds the CSV in the backend, asks where to save it, writes it.
+/// Returns the saved path, or None if the user cancelled.
+#[tauri::command(async)]
+pub fn export_report_csv(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    kind: String,
+    filter: ReportFilter,
+    file_name: String,
+) -> CmdResult<Option<String>> {
+    let csv = read(&state, |s| s.report_csv(&kind, &filter))?;
+    let Some(chosen) = app
+        .dialog()
+        .file()
+        .set_title("Save report as CSV")
+        .set_file_name(&file_name)
+        .add_filter("CSV spreadsheet", &["csv"])
+        .blocking_save_file()
+    else {
+        return Ok(None);
+    };
+    let mut path = chosen
+        .into_path()
+        .map_err(|e| CoreError::Invalid(format!("Can't save there: {e}")))?;
+    if path.extension().is_none() {
+        path.set_extension("csv");
+    }
+    std::fs::write(&path, csv)?;
+    Ok(Some(path.display().to_string()))
+}

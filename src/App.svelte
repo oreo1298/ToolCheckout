@@ -10,6 +10,7 @@
   import Borrowers from './lib/screens/Borrowers.svelte';
   import Home from './lib/screens/Home.svelte';
   import Incidents from './lib/screens/Incidents.svelte';
+  import Reports from './lib/screens/Reports.svelte';
   import Settings from './lib/screens/Settings.svelte';
   import Setup from './lib/screens/Setup.svelte';
   import Tools from './lib/screens/Tools.svelte';
@@ -98,6 +99,8 @@
         <Settings />
       {:else if app.screen === 'incidents'}
         <Incidents />
+      {:else if app.screen === 'reports'}
+        <Reports />
       {:else if app.screen === 'tools'}
         <Tools />
       {:else if app.screen === 'borrowers'}
