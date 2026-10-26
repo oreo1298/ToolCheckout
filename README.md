@@ -255,13 +255,14 @@ sudo pacman -Syu --needed base-devel curl git webkit2gtk-4.1 nodejs npm
 
 ##### openSUSE
 
-Tumbleweed and Leap 16. `webkit2gtk3-devel` is openSUSE's name for WebKitGTK
-4.1 built for GTK 3, which is the one ToolCheckout needs.
+Tumbleweed and Leap 16. openSUSE has renamed its WebKitGTK packages between
+releases, so this asks for WebKitGTK 4.1 and D-Bus by what they provide
+(`pkgconfig(…)`) rather than by package name. Keep the quotes.
 
 <!-- ci-linux: deps-opensuse -->
 ```sh
 sudo zypper install gcc pkg-config curl git \
-  webkit2gtk3-devel dbus-1-devel
+  'pkgconfig(webkit2gtk-4.1)' 'pkgconfig(dbus-1)'
 ```
 
 ##### Void Linux
@@ -332,10 +333,14 @@ else whose Node.js is too old: install it per user with
 [nvm](https://github.com/nvm-sh/nvm). No root needed, and it doesn't touch the
 system's Node.js.
 
+The first line fixes nvm's folder to `~/.nvm`. Without it, nvm picks
+`~/.config/nvm` on some desktops.
+
 <!-- ci-linux: node-nvm -->
 ```sh
+export NVM_DIR="$HOME/.nvm" && mkdir -p "$NVM_DIR"
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-. "$HOME/.nvm/nvm.sh"
+. "$NVM_DIR/nvm.sh"
 nvm install 22
 ```
 
