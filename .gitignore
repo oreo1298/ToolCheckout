@@ -7,3 +7,9 @@ target/
 .DS_Store
 /src-tauri/gen/schemas/
 coverage/
+# makepkg (packaging/arch) and packaging/{deb,rpm} outputs
+/packaging/arch/src/
+/packaging/arch/pkg/
+/packaging/arch/*.pkg.tar.*
+/ToolCheckout_*.deb
+/ToolCheckout-*.rpm

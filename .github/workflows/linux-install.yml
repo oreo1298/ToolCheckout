@@ -1,0 +1,176 @@
+# Tests the Linux installer the way the README tells people to use it: on a clean container of each
+# supported distribution, as a normal user with sudo, run ./install.sh, ./update.sh and
+# ./uninstall.sh, then the per-user install (--user), then the .deb/.rpm build scripts. After each
+# install it checks that the program, its menu entry and every library it needs are in place.
+name: Linux install
+
+on:
+  push:
+    paths:
+      - install.sh
+      - update.sh
+      - uninstall.sh
+      - Makefile
+      - data/**
+      - packaging/arch/**
+      - packaging/deb/**
+      - packaging/rpm/**
+      - .github/workflows/linux-install.yml
+      - package.json
+      - package-lock.json
+      - Cargo.toml
+      - Cargo.lock
+      - src-tauri/Cargo.toml
+      - src-tauri/tauri.conf.json
+      - src-tauri/tauri.linux.conf.json
+  pull_request:
+    paths:
+      - install.sh
+      - update.sh
+      - uninstall.sh
+      - Makefile
+      - data/**
+      - packaging/arch/**
+      - packaging/deb/**
+      - packaging/rpm/**
+      - .github/workflows/linux-install.yml
+      - package.json
+      - package-lock.json
+      - Cargo.toml
+      - Cargo.lock
+      - src-tauri/Cargo.toml
+      - src-tauri/tauri.conf.json
+      - src-tauri/tauri.linux.conf.json
+  schedule:
+    - cron: '17 5 1 * *' # monthly: catches distributions renaming packages
+  workflow_dispatch:
+
+concurrency:
+  group: linux-install-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Ubuntu 22.04, image: 'ubuntu:22.04', package: deb }
+          - { name: Ubuntu 24.04, image: 'ubuntu:24.04' }
+          - { name: Debian 12, image: 'debian:12' }
+          - { name: Debian 13, image: 'debian:13', package: deb }
+          - { name: Fedora, image: 'fedora:latest', package: rpm }
+          - { name: AlmaLinux 10, image: 'almalinux:10' }
+          - { name: Arch Linux, image: 'archlinux:latest' }
+          - { name: openSUSE Tumbleweed, image: 'opensuse/tumbleweed:latest', package: rpm }
+          - { name: openSUSE Leap 16, image: 'opensuse/leap:16.0' }
+          - { name: Void Linux, image: 'ghcr.io/void-linux/void-glibc-full:latest' }
+    defaults:
+      run:
+        shell: sh
+    env:
+      WS: ${{ github.workspace }}
+    steps:
+      # Test plumbing, not part of the instructions: sudo, a normal user, and git for the checkout
+      # (the installer needs git itself too).
+      - name: Create a normal user with sudo
+        timeout-minutes: 15
+        run: |
+          set -eu
+          if command -v apt-get >/dev/null; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -q && apt-get install -y -q sudo git ca-certificates
+          elif command -v dnf >/dev/null; then
+            dnf install -y sudo git tar gzip
+          elif command -v pacman >/dev/null; then
+            pacman -Syu --noconfirm --needed sudo git
+          elif command -v zypper >/dev/null; then
+            zypper --non-interactive install sudo git tar gzip shadow
+          elif command -v xbps-install >/dev/null; then
+            xbps-install -Syu xbps && xbps-install -yu && xbps-install -y sudo git bash
+          fi
+          useradd -m -s /bin/bash builder
+          printf '%s\n' 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chmod 440 /etc/sudoers.d/builder
+          cat > /usr/local/bin/check-installed <<'EOF'
+          #!/bin/sh
+          # check-installed BINARY DESKTOP_FILE: the program, its menu entry and its libraries are there.
+          set -eu
+          test -x "$1" || { echo "missing: $1"; exit 1; }
+          test -f "$2" || { echo "missing: $2"; exit 1; }
+          grep -qx 'StartupWMClass=toolcheckout' "$2" || { echo "wrong StartupWMClass in $2"; exit 1; }
+          ldd "$1" > /tmp/ldd.txt
+          if grep 'not found' /tmp/ldd.txt; then echo "missing libraries"; exit 1; fi
+          echo "OK: $1 and $2 are installed; all $(wc -l < /tmp/ldd.txt) libraries resolve."
+          EOF
+          chmod 755 /usr/local/bin/check-installed
+
+      - uses: actions/checkout@v5
+
+      - name: Hand the checkout to the normal user
+        run: |
+          chown -R builder "$WS"
+          su - builder -c "git config --global --add safe.directory '$WS'"
+
+      - name: ./install.sh
+        run: su - builder -c "cd '$WS' && ./install.sh --yes"
+
+      - name: Check the installation
+        run: |
+          set -eu
+          if command -v pacman >/dev/null; then
+            pacman -Qi toolcheckout
+            check-installed /usr/bin/toolcheckout /usr/share/applications/io.github.oreo1298.ToolCheckout.desktop
+          else
+            cat /usr/local/lib/toolcheckout/install-manifest.txt
+            check-installed /usr/local/bin/toolcheckout /usr/local/share/applications/io.github.oreo1298.ToolCheckout.desktop
+          fi
+
+      - name: ./update.sh
+        if: github.event_name != 'pull_request'
+        run: su - builder -c "cd '$WS' && ./update.sh --yes"
+
+      - name: ./uninstall.sh
+        run: |
+          set -eu
+          su - builder -c "cd '$WS' && ./uninstall.sh --yes"
+          test ! -e /usr/local/bin/toolcheckout
+          test ! -e /usr/bin/toolcheckout
+          test ! -e /usr/local/share/applications/io.github.oreo1298.ToolCheckout.desktop
+
+      - name: ./install.sh --user, then uninstall
+        run: |
+          set -eu
+          su - builder -c "cd '$WS' && ./install.sh --user --no-deps --yes"
+          check-installed /home/builder/.local/bin/toolcheckout /home/builder/.local/share/applications/io.github.oreo1298.ToolCheckout.desktop
+          su - builder -c "/home/builder/.local/lib/toolcheckout/uninstall.sh --yes"
+          test ! -e /home/builder/.local/bin/toolcheckout
+          test ! -e /home/builder/.local/lib/toolcheckout
+
+      - name: packaging/deb/build-deb.sh
+        if: matrix.package == 'deb'
+        run: |
+          set -eu
+          su - builder -c "cd '$WS' && ./packaging/deb/build-deb.sh"
+          su - builder -c "cd '$WS' && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ./ToolCheckout_*_amd64.deb"
+          check-installed /usr/bin/toolcheckout /usr/share/applications/ToolCheckout.desktop
+          su - builder -c "sudo apt-get remove -y tool-checkout"
+
+      - name: packaging/rpm/build-rpm.sh
+        if: matrix.package == 'rpm'
+        run: |
+          set -eu
+          su - builder -c "cd '$WS' && ./packaging/rpm/build-rpm.sh"
+          if command -v zypper >/dev/null; then
+            su - builder -c "cd '$WS' && sudo zypper --non-interactive install --allow-unsigned-rpm ./ToolCheckout-*.rpm"
+            check-installed /usr/bin/toolcheckout /usr/share/applications/ToolCheckout.desktop
+            su - builder -c "sudo zypper --non-interactive remove tool-checkout"
+          else
+            su - builder -c "cd '$WS' && sudo dnf install -y ./ToolCheckout-*.rpm"
+            check-installed /usr/bin/toolcheckout /usr/share/applications/ToolCheckout.desktop
+            su - builder -c "sudo dnf remove -y tool-checkout"
+          fi

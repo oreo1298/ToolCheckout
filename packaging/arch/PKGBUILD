@@ -1,0 +1,51 @@
+# Builds an Arch Linux package from this git checkout of ToolCheckout.
+#
+#   cd packaging/arch && makepkg -si      install or update
+#   sudo pacman -R toolcheckout           uninstall (your shop data is kept)
+#
+# ./install.sh does exactly this on Arch-based distributions. The version is taken from
+# tauri.conf.json plus the number of commits, so every `git pull` that brings new commits produces
+# a newer package.
+
+_srcroot="$(cd "$startdir/../.." && pwd)"
+
+pkgname=toolcheckout
+pkgver="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$_srcroot/src-tauri/tauri.conf.json" | head -n1).r$(git -C "$_srcroot" rev-list --count HEAD 2>/dev/null || echo 0)"
+pkgrel=1
+pkgdesc='Tool checkout and return tracking for a repair shop counter PC'
+arch=('x86_64' 'aarch64')
+url='https://github.com/oreo1298/ToolCheckout'
+license=('LicenseRef-unspecified')
+depends=('webkit2gtk-4.1' 'gtk3' 'dbus' 'glib2' 'glibc' 'gcc-libs' 'hicolor-icon-theme')
+makedepends=('cargo' 'nodejs' 'npm' 'git')
+optdepends=('xdg-desktop-portal: follow the desktop light/dark theme live')
+# Precaution: makepkg's LTO flags turn the bundled SQLite into LTO objects, a known source of link
+# failures in Rust packages that compile C code.
+options=('!lto' '!debug')
+source=()
+sha256sums=()
+
+prepare() {
+  cd "$_srcroot"
+  npm ci --no-audit --no-fund
+}
+
+build() {
+  cd "$_srcroot"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  npm run tauri -- build --no-bundle
+}
+
+check() {
+  cd "$_srcroot"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR="$srcdir/target"
+  cargo test -p toolcheckout-core --release --locked
+}
+
+package() {
+  cd "$_srcroot"
+  make install DESTDIR="$pkgdir" PREFIX=/usr BIN_SRC="$srcdir/target/release/toolcheckout"
+  rm -rf "$pkgdir/usr/lib/toolcheckout"      # pacman takes care of removal
+}

@@ -125,15 +125,195 @@ and keep the `data` folder.
 
 There are three ways, for x86_64 PCs:
 
-* **[AppImage](#appimage)**: a single file that runs on almost any current
-  distribution. No root needed.
-* **[.deb package](#deb-package-debian-ubuntu-mint)** for Debian, Ubuntu,
-  Linux Mint and other Ubuntu-based distributions. It adds a menu entry.
-* **[Build from source](#build-from-source)**. You'll need this for a native
-  package or menu entry on Fedora, Arch, openSUSE, Void and others. It's
-  also an option on any distribution.
+* **[`install.sh`](#install-with-installsh-any-distribution)** (recommended):
+  builds ToolCheckout on your PC and installs it with a menu entry. It works on
+  every common distribution and updates with one command.
+* **[AppImage](#appimage)**: a single ready-made file from the Releases page.
+  Runs on almost any current distribution, no root needed.
+* **[.deb package](#deb-package-debian-ubuntu-mint)**: ready-made, for Debian,
+  Ubuntu, Linux Mint and other Ubuntu-based distributions.
+
+### Install with install.sh (any distribution)
+
+```sh
+git clone https://github.com/oreo1298/ToolCheckout.git
+cd ToolCheckout
+./install.sh            # for all users, into /usr/local (asks for your password)
+```
+
+or, just for your user account (into `~/.local`):
+
+```sh
+./install.sh --user
+```
+
+`install.sh` does the following:
+
+1. Detects your distribution.
+2. Installs what's missing with your package manager (`apt`, `dnf`, `pacman`,
+   `zypper`, `xbps` or `emerge`), after asking you once.
+3. Sets up Rust and Node.js just for your user (rustup and nvm) if your
+   distribution's are missing or too old.
+4. Builds ToolCheckout, checks that every library it needs is there, and
+   installs it with a menu entry and icon.
+
+On Arch-based distributions it builds a regular pacman package instead, so
+pacman knows every file. It asks for your password only for the steps that
+need it. Run it as your normal user, not with `sudo`. The first build takes 5
+to 15 minutes and about 3 GB of disk space.
+
+Then start **ToolCheckout** from your applications menu, or run `toolcheckout`.
+
+If `git` is missing, install it first:
+
+| Distribution | Command |
+| --- | --- |
+| Debian, Ubuntu, Linux Mint, Pop!\_OS, elementary OS, Zorin OS | `sudo apt install git` |
+| Fedora, RHEL, AlmaLinux, Rocky Linux | `sudo dnf install git` |
+| Arch, Manjaro, EndeavourOS, Garuda, CachyOS | `sudo pacman -S --needed git base-devel` |
+| openSUSE | `sudo zypper install git` |
+| Void | `sudo xbps-install -S git` |
+| Gentoo | `sudo emerge --noreplace dev-vcs/git` |
+
+#### Update and uninstall
+
+```sh
+./update.sh       # download the latest version and reinstall it the same way
+./uninstall.sh    # remove ToolCheckout
+```
+
+Neither one ever touches your shop data (`~/.local/share/toolcheckout`, or
+the folder chosen in Settings). If you deleted the `ToolCheckout` folder,
+uninstall with the copy that `install.sh` keeps:
+`sudo /usr/local/lib/toolcheckout/uninstall.sh`, or
+`~/.local/lib/toolcheckout/uninstall.sh` for a `--user` install. On Arch, use
+`sudo pacman -R toolcheckout`.
+
+#### Options
+
+| Option | Meaning |
+| --- | --- |
+| `--user` | install just for you into `~/.local`; no password needed for the install step |
+| `--prefix DIR` | install somewhere else (default `/usr/local`) |
+| `--update` | same as `./update.sh` |
+| `--uninstall` | same as `./uninstall.sh` |
+| `--no-deps` | don't install packages; you've installed the dependencies yourself |
+| `--deps-only` | only install the dependencies, e.g. before building a .deb or .rpm |
+| `--no-package` | on Arch-based distributions, install with `make` instead of a pacman package |
+| `-y`, `--yes` | don't ask questions |
+
+#### What it installs
+
+These packages are installed automatically by `install.sh`:
+
+| Distribution | Packages | Tested in CI |
+| --- | --- | :-: |
+| Ubuntu 22.04+, Linux Mint 21+, Pop!\_OS, elementary OS, Zorin OS, KDE neon, Debian 12+ | `build-essential pkg-config curl git libwebkit2gtk-4.1-dev libdbus-1-dev` (+ `nodejs npm` where new enough, e.g. Debian 13) | ✓ |
+| Fedora 41+ | `gcc make pkgconf-pkg-config curl git webkit2gtk4.1-devel dbus-devel nodejs npm` | ✓ |
+| RHEL, AlmaLinux, Rocky Linux 10 | the Fedora list, after enabling the EPEL and CRB repositories (`webkit2gtk4.1-devel` is in EPEL) | ✓ |
+| Arch, Manjaro, EndeavourOS, Garuda, CachyOS | `base-devel git`, then `makepkg` adds `webkit2gtk-4.1 cargo nodejs npm` | ✓ |
+| openSUSE Tumbleweed, Leap 16 | `gcc make pkg-config curl git 'pkgconfig(webkit2gtk-4.1)' 'pkgconfig(dbus-1)'` (+ `nodejs-default npm-default` on Tumbleweed) | ✓ |
+| Void | `base-devel pkg-config curl git libwebkit2gtk41-devel dbus-devel nodejs` | ✓ |
+| Gentoo | `net-libs/webkit-gtk:4.1 sys-apps/dbus dev-vcs/git net-misc/curl net-libs/nodejs` | – |
+
+It also needs **Rust 1.90+** and **Node.js 20.19+ or 22.12+**. If yours are
+missing or older, `install.sh` offers to install them just for you:
+
+* Rust through [rustup](https://rustup.rs), into `~/.cargo`.
+* Node.js 22 through [nvm](https://github.com/nvm-sh/nvm), into `~/.nvm`.
+  This is needed on Ubuntu, Debian 12 and openSUSE Leap, and it doesn't touch
+  the system's Node.js.
+
+"Tested in CI" means that
+[`linux-install.yml`](.github/workflows/linux-install.yml) runs `install.sh`,
+`update.sh`, `uninstall.sh`, a `--user` install and the .deb/.rpm build scripts
+on a clean container of that distribution, as a normal user with `sudo`. After
+each install it checks that the program, its menu entry and every library it
+needs are in place. Ubuntu-based distributions follow their Ubuntu base.
+Gentoo isn't tested.
+
+Older releases (Ubuntu 20.04, Debian 11, Linux Mint 20, Fedora 35 and
+earlier) don't have WebKitGTK 4.1, so they can't build ToolCheckout. Their
+glibc is also too old for the AppImage, so upgrade the distribution first.
+
+#### Distribution notes
+
+**Arch Linux, Manjaro, EndeavourOS, CachyOS:** `install.sh` builds the
+package from [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD) and installs
+it with pacman. If you prefer doing it by hand, this is all it does:
+
+```sh
+cd ToolCheckout/packaging/arch
+makepkg -si
+```
+
+**Debian, Ubuntu, Linux Mint, Pop!\_OS:** to install a regular .deb package
+instead (the same package as on the Releases page):
+
+```sh
+./install.sh --deps-only
+./packaging/deb/build-deb.sh
+sudo apt install ./ToolCheckout_*_amd64.deb
+```
+
+Remove it with `sudo apt remove tool-checkout`.
+
+**Fedora, RHEL, AlmaLinux, Rocky Linux, openSUSE:** to install an .rpm
+package instead:
+
+```sh
+./install.sh --deps-only
+./packaging/rpm/build-rpm.sh
+sudo dnf install ./ToolCheckout-*.rpm
+# openSUSE: sudo zypper install --allow-unsigned-rpm ./ToolCheckout-*.rpm
+```
+
+Remove it with `sudo dnf remove tool-checkout`
+(`sudo zypper remove tool-checkout`).
+
+**RHEL, AlmaLinux, Rocky Linux 10:** `install.sh` enables EPEL and the
+CodeReady Builder (CRB) repository, after asking. On RHEL itself it uses
+`subscription-manager` for CRB.
+
+**NixOS, Fedora Silverblue, Kinoite, Bazzite and other immutable systems:**
+use the [AppImage](#appimage).
+
+**Gentoo:** not tested by us. WebKitGTK is large, so allow time for it to
+compile unless you use the binary package host.
+
+#### Building by hand
+
+If you'd rather not use `install.sh`, install the packages and Rust/Node.js
+listed above, then run:
+
+```sh
+make                      # build (as your normal user, not with sudo)
+sudo make install         # into /usr/local; or: make install PREFIX=~/.local
+sudo make uninstall       # remove again (same PREFIX)
+```
+
+`make check` runs the test suites. Packagers can use
+`make install DESTDIR=… PREFIX=/usr`.
+
+#### If something goes wrong
+
+* **`Please run ./install.sh as your normal user`**: start it without `sudo`.
+  It asks for your password when needed, and keeps the build files owned by
+  you.
+* **`The development files for webkit2gtk-4.1 were not found`**: run
+  `./install.sh` without `--no-deps`, or your distribution is too old to have
+  WebKitGTK 4.1.
+* **`git pull failed`** during `./update.sh`: you changed files in the
+  `ToolCheckout` folder. Run `git stash`, then `./update.sh` again.
+* **The build is killed or the PC freezes** (low memory): build with fewer
+  parallel jobs, e.g. `CARGO_BUILD_JOBS=2 ./install.sh`.
+* **pacman can't find a package (404)**: update the system first with
+  `sudo pacman -Syu`.
 
 ### AppImage
+
+Download `ToolCheckout_<version>_amd64.AppImage` from the
+[Releases page](https://github.com/oreo1298/ToolCheckout/releases/latest), then:
 
 ```sh
 chmod +x ToolCheckout_*_amd64.AppImage
@@ -155,7 +335,8 @@ If it won't start because FUSE is missing, install it
 ```
 
 To get a menu entry for an AppImage, use a helper such as Gear Lever or
-AppImageLauncher, or [build from source](#build-from-source) instead.
+AppImageLauncher, or use [`install.sh`](#install-with-installsh-any-distribution)
+instead.
 
 **Fedora Silverblue, Kinoite, Bazzite and other immutable systems:** use the
 AppImage. **NixOS:** run it with
@@ -166,6 +347,9 @@ directly.
 
 ### .deb package (Debian, Ubuntu, Mint…)
 
+Download `ToolCheckout_<version>_amd64.deb` from the
+[Releases page](https://github.com/oreo1298/ToolCheckout/releases/latest), then:
+
 ```sh
 sudo apt install ./ToolCheckout_*_amd64.deb
 ```
@@ -175,270 +359,6 @@ Debian 12+, Ubuntu 22.04+, Linux Mint 21+, Pop!_OS 22.04+, elementary OS 7+,
 Zorin OS 17+ and KDE neon. To update, install the newer .deb the same way.
 To uninstall, run `sudo apt remove tool-checkout`. Your data is kept either
 way.
-
-### Build from source
-
-These steps build ToolCheckout on your own PC and install it like any other
-app. Expect 5 to 15 minutes for the first build, and about 3 GB of free disk
-space. Most of that is Rust's build cache, which you can delete afterwards
-with `rm -rf target`.
-
-You need a C compiler, `pkg-config`, the WebKitGTK 4.1 and D-Bus development
-files, Git and curl (step 1), Rust 1.90 or newer (step 2), and Node.js 20.19+
-or 22.12+ with npm (step 3).
-
-| Distribution | Step 1 | Step 3 (Node.js) | Step 5 (install as) | Tested in CI |
-| --- | --- | --- | --- | :-: |
-| Ubuntu 22.04+, Linux Mint 21+, Pop!\_OS, elementary OS, Zorin OS, KDE neon | [Debian / Ubuntu](#debian-ubuntu-and-derivatives) | [nvm](#nodejs-from-nvm) | [.deb](#debian-ubuntu-and-derivatives-1) | ✓ |
-| Debian 13 | [Debian / Ubuntu](#debian-ubuntu-and-derivatives) | [apt](#nodejs-from-your-distribution) | [.deb](#debian-ubuntu-and-derivatives-1) | ✓ |
-| Debian 12 | [Debian / Ubuntu](#debian-ubuntu-and-derivatives) | [nvm](#nodejs-from-nvm) | [.deb](#debian-ubuntu-and-derivatives-1) | ✓ |
-| Fedora 41+ | [Fedora](#fedora) | [dnf](#nodejs-from-your-distribution) | [.rpm](#fedora-rhel-almalinux-rocky) | ✓ |
-| RHEL, AlmaLinux, Rocky Linux 10 | [RHEL family](#rhel-almalinux-rocky-linux-10) | [dnf](#nodejs-from-your-distribution) | [.rpm](#fedora-rhel-almalinux-rocky) | ✓ |
-| Arch, Manjaro, EndeavourOS, Garuda | [Arch](#arch-linux-and-derivatives) | [pacman](#nodejs-from-your-distribution) | [install script](#any-other-distribution) | ✓ |
-| openSUSE Tumbleweed | [openSUSE](#opensuse) | [zypper](#nodejs-from-your-distribution) | [.rpm](#opensuse-1) | ✓ |
-| openSUSE Leap 16 | [openSUSE](#opensuse) | [nvm](#nodejs-from-nvm) | [.rpm](#opensuse-1) | ✓ |
-| Void Linux | [Void](#void-linux) | [xbps](#nodejs-from-your-distribution) | [install script](#any-other-distribution) | ✓ |
-| Gentoo | [Gentoo](#gentoo) | [emerge](#nodejs-from-your-distribution) | [install script](#any-other-distribution) | – |
-
-"Tested in CI" means a GitHub Actions workflow
-(`.github/workflows/linux-source-build.yml`) runs the commands below, as
-written in this README, on a clean container of that distribution as a normal
-user with `sudo`. It then checks that the installed app finds all of its
-libraries. Ubuntu-based distributions follow their Ubuntu base. Older releases
-(Ubuntu 20.04, Debian 11, Linux Mint 20, Fedora 35 and earlier) don't ship
-WebKitGTK 4.1, so they can't build ToolCheckout. Their glibc is also too old
-for the AppImage, so upgrade the distribution first.
-
-#### Step 1: system packages
-
-##### Debian, Ubuntu and derivatives
-
-<!-- ci-linux: deps-debian -->
-```sh
-sudo apt update
-sudo apt install build-essential pkg-config curl git \
-  libwebkit2gtk-4.1-dev libdbus-1-dev
-```
-
-##### Fedora
-
-<!-- ci-linux: deps-fedora -->
-```sh
-sudo dnf install gcc pkgconf-pkg-config curl git \
-  webkit2gtk4.1-devel dbus-devel
-```
-
-##### RHEL, AlmaLinux, Rocky Linux 10
-
-The WebKitGTK 4.1 development files come from EPEL, which also needs the
-CodeReady Builder (CRB) repository. On RHEL itself, install EPEL with
-`sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm`
-and enable CRB with
-`sudo subscription-manager repos --enable codeready-builder-for-rhel-10-x86_64-rpms`
-instead of the first two lines.
-
-<!-- ci-linux: deps-rhel -->
-```sh
-sudo dnf install dnf-plugins-core epel-release
-sudo dnf config-manager --set-enabled crb
-sudo dnf install gcc pkgconf-pkg-config curl git \
-  webkit2gtk4.1-devel dbus-devel
-```
-
-##### Arch Linux and derivatives
-
-Arch, Manjaro, EndeavourOS, Garuda and others. This also installs Node.js
-(step 3).
-
-<!-- ci-linux: deps-arch -->
-```sh
-sudo pacman -Syu --needed base-devel curl git webkit2gtk-4.1 nodejs npm
-```
-
-##### openSUSE
-
-Tumbleweed and Leap 16. openSUSE has renamed its WebKitGTK packages between
-releases, so this asks for WebKitGTK 4.1 and D-Bus by what they provide
-(`pkgconfig(…)`) rather than by package name. Keep the quotes.
-
-<!-- ci-linux: deps-opensuse -->
-```sh
-sudo zypper install gcc pkg-config curl git \
-  'pkgconfig(webkit2gtk-4.1)' 'pkgconfig(dbus-1)'
-```
-
-##### Void Linux
-
-This also installs Node.js (step 3).
-
-<!-- ci-linux: deps-void -->
-```sh
-sudo xbps-install -Su base-devel pkg-config curl git \
-  libwebkit2gtk41-devel dbus-devel nodejs
-```
-
-##### Gentoo
-
-Not tested by us. WebKitGTK is large, so allow time for it to compile unless
-you use the binary package host.
-
-```sh
-sudo emerge --ask --noreplace net-libs/webkit-gtk:4.1 sys-apps/dbus \
-  dev-vcs/git net-misc/curl net-libs/nodejs
-```
-
-#### Step 2: Rust
-
-Use `rustup`, the official installer. It installs into your home folder
-(`~/.cargo`, `~/.rustup`) and doesn't need root. A Rust from your distribution
-works too if `rustc --version` says 1.90 or newer.
-
-<!-- ci-linux: rust -->
-```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-. "$HOME/.cargo/env"
-```
-
-New terminals pick up Rust automatically. `rustup update` updates it later.
-
-#### Step 3: Node.js
-
-You need Node.js 20.19+ or 22.12+ with npm. If `node --version` already shows
-a new enough version, skip this step.
-
-##### Node.js from your distribution
-
-These distributions ship a new enough Node.js. Arch and Void already got it in
-step 1.
-
-<!-- ci-linux: node-debian -->
-```sh
-sudo apt install nodejs npm                   # Debian 13
-```
-
-<!-- ci-linux: node-dnf -->
-```sh
-sudo dnf install nodejs npm                   # Fedora, RHEL, AlmaLinux, Rocky
-```
-
-<!-- ci-linux: node-opensuse -->
-```sh
-sudo zypper install nodejs-default npm-default   # openSUSE Tumbleweed
-```
-
-On Gentoo, `net-libs/nodejs` came with step 1.
-
-##### Node.js from nvm
-
-Ubuntu and Ubuntu-based distributions, Debian 12, openSUSE Leap and anything
-else whose Node.js is too old: install it per user with
-[nvm](https://github.com/nvm-sh/nvm). No root needed, and it doesn't touch the
-system's Node.js.
-
-The first line fixes nvm's folder to `~/.nvm`. Without it, nvm picks
-`~/.config/nvm` on some desktops.
-
-<!-- ci-linux: node-nvm -->
-```sh
-export NVM_DIR="$HOME/.nvm" && mkdir -p "$NVM_DIR"
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-. "$NVM_DIR/nvm.sh"
-nvm install 22
-```
-
-#### Step 4: get the code
-
-```sh
-git clone https://github.com/oreo1298/ToolCheckout.git
-cd ToolCheckout
-```
-
-That gets the newest code. To build a specific release instead, run
-`git checkout v0.1.0` (any tag from the
-[Releases page](https://github.com/oreo1298/ToolCheckout/releases)).
-
-#### Step 5: build and install
-
-Run these in the `ToolCheckout` folder. `npm ci` downloads the JavaScript
-build tools (into `node_modules`, nothing system-wide). `npx tauri build`
-compiles the app and makes the package.
-
-##### Debian, Ubuntu and derivatives
-
-<!-- ci-linux: build-deb -->
-```sh
-npm ci
-npx tauri build --bundles deb
-sudo apt install ./target/release/bundle/deb/ToolCheckout_*_amd64.deb
-```
-
-apt may print a note that the download is "performed unsandboxed as root".
-That's harmless for a local file. To uninstall: `sudo apt remove tool-checkout`.
-
-##### Fedora, RHEL, AlmaLinux, Rocky
-
-<!-- ci-linux: build-rpm-dnf -->
-```sh
-npm ci
-npx tauri build --bundles rpm
-sudo dnf install ./target/release/bundle/rpm/ToolCheckout-*.x86_64.rpm
-```
-
-To uninstall: `sudo dnf remove tool-checkout`.
-
-##### openSUSE
-
-<!-- ci-linux: build-rpm-zypper -->
-```sh
-npm ci
-npx tauri build --bundles rpm
-sudo zypper install --allow-unsigned-rpm ./target/release/bundle/rpm/ToolCheckout-*.x86_64.rpm
-```
-
-To uninstall: `sudo zypper remove tool-checkout`.
-
-##### Any other distribution
-
-Arch, Void, Gentoo and everything else. This builds just the program, then
-installs it for you only into `~/.local`, with a menu entry and icon (no
-root). Use `sudo ./scripts/install-linux.sh --system` to install it for all
-users into `/usr/local` instead.
-
-<!-- ci-linux: build-local -->
-```sh
-npm ci
-npx tauri build --no-bundle
-./scripts/install-linux.sh
-```
-
-To uninstall: `./scripts/install-linux.sh --uninstall` (add `--system` if you
-installed with it).
-
-You can also run the freshly built program without installing it:
-`./target/release/ToolCheckout`.
-
-#### After installing
-
-ToolCheckout is in your application menu (on some desktops, after logging
-out and back in), or start it with `ToolCheckout` in a terminal. Uninstalling
-never removes your data in `~/.local/share/toolcheckout`.
-
-**Updating a source build:** in the `ToolCheckout` folder, run `git pull` (or
-`git fetch --tags` and `git checkout` the new release tag), then repeat
-step 5.
-
-#### If the build fails
-
-* **`Package webkit2gtk-4.1 was not found`** (or `dbus-1`): the step 1
-  packages are missing, or your distribution is too old to have WebKitGTK 4.1.
-* **`rustc 1.xx is not supported`** or similar: run `rustup update`. A
-  distribution's Rust may be too old; use rustup (step 2).
-* **`npm ci` reports `EBADENGINE` or Vite says Node.js is too old**: install
-  Node.js 22 with nvm (step 3), then open a new terminal.
-* **`npx: command not found`**: npm isn't installed. On Debian and Ubuntu it's
-  the separate `npm` package; with nvm it comes with Node.js.
-* **The build is killed or the PC freezes** (low memory): build with fewer
-  parallel jobs, e.g. `CARGO_BUILD_JOBS=2 npx tauri build …`.
 
 ### Theme, notifications and display problems
 
@@ -452,9 +372,11 @@ standard desktop notification service.
 
 If the window stays blank or flickers (seen with some NVIDIA drivers and in
 virtual machines), start it with WebKitGTK's DMA-BUF renderer turned off:
-`WEBKIT_DISABLE_DMABUF_RENDERER=1 ToolCheckout`. To make that permanent for a
-source install, add it to the `Exec=` line of the menu entry, e.g.
-`Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 ToolCheckout`.
+`WEBKIT_DISABLE_DMABUF_RENDERER=1 toolcheckout`. To make that permanent, copy
+the menu entry to `~/.local/share/applications/` and change its `Exec=` line
+to `Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 toolcheckout`. The menu entry is
+`io.github.oreo1298.ToolCheckout.desktop` for an `install.sh` install, or
+`ToolCheckout.desktop` for a package.
 
 ---
 
@@ -751,7 +673,8 @@ location.
 
 Setting up a development machine:
 
-* **Linux:** steps 1 to 3 of [Build from source](#build-from-source).
+* **Linux:** `./install.sh --deps-only` installs everything needed (see
+  [What it installs](#what-it-installs)).
 * **Windows:** [Rust](https://rustup.rs) with the "Desktop development with
   C++" workload of Visual Studio Build Tools (the rustup installer offers
   it), and Node.js 22. WebView2 is already part of Windows 10/11.
@@ -793,7 +716,9 @@ portable .zip, the AppImage, the .deb and `SHA256SUMS.txt`.
 | `src-tauri`             | The desktop shell: Tauri commands, OS theme/accent, notifications, background jobs |
 | `src`                   | The Svelte + TypeScript UI                                            |
 | `.github/workflows/ci.yml` | Tests on Linux and Windows; builds the NSIS installer, portable exe, AppImage and .deb; publishes releases for `v*` tags |
-| `.github/workflows/linux-source-build.yml` | Runs this README's Linux build-from-source commands on each listed distribution |
-| `scripts/install-linux.sh` | Installs a source build with a menu entry (`--system`, `--uninstall`) |
+| `install.sh`, `update.sh`, `uninstall.sh` | The Linux installer (any distribution; pacman package on Arch) |
+| `Makefile`, `data/` | Linux build/install rules, menu entry and AppStream metadata |
+| `packaging/` | Arch `PKGBUILD`, .deb and .rpm build scripts, portable-build readme, release notes |
+| `.github/workflows/linux-install.yml` | Tests the Linux installer and package scripts on ten distributions |
 | `PLAN.md`               | Architecture, data model, milestones                                  |
 | `DECISIONS.md`          | Every judgment call made along the way, and why                      |

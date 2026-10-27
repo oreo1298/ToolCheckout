@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.oreo1298.ToolCheckout</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>ToolCheckout</name>
+  <summary>Fast, accountable tool loans for a repair shop</summary>
+  <developer id="io.github.oreo1298">
+    <name>ToolCheckout contributors</name>
+  </developer>
+  <description>
+    <p>
+      ToolCheckout tracks who has which tool at a repair shop. It runs on the shared counter PC,
+      works fully offline and needs no server.
+    </p>
+    <ul>
+      <li>Check out in about three taps: scan a tool, scan or pick the borrower, confirm with a PIN</li>
+      <li>Technicians inspect returns; a tool that comes back worse opens a damage incident</li>
+      <li>Overdue tools stand out, with desktop notifications and an end-of-day reminder</li>
+      <li>Hash-chained audit log, reports as CSV or printouts, Code 128 asset labels</li>
+      <li>Daily automatic backups, restore, and a demo mode with sample data</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.oreo1298.ToolCheckout.desktop</launchable>
+  <url type="homepage">https://github.com/oreo1298/ToolCheckout</url>
+  <url type="bugtracker">https://github.com/oreo1298/ToolCheckout/issues</url>
+  <provides>
+    <binary>toolcheckout</binary>
+  </provides>
+  <categories>
+    <category>Office</category>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-26">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

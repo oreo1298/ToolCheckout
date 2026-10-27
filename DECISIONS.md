@@ -75,13 +75,48 @@ at the bottom of each group.
   silently use the per-user data folder, which is what the installer is for.
   No .rpm in releases: Tauri's rpm has no distribution-neutral dependency
   names, so Fedora/openSUSE users build it from source (README).
-* **Linux build-from-source docs are tested.** Each README command block is
-  tagged `<!-- ci-linux: NAME -->`. `linux-source-build.yml` extracts the
-  blocks a reader of each distribution follows and runs them unchanged (apart
-  from auto-answering package-manager prompts) in clean containers, as a
-  non-root user with sudo, then checks that the installed binary resolves all
-  its libraries. It runs when the README, the install script or the
-  dependency manifests change, and monthly to catch package renames.
+* **Linux installer follows the owner's other projects** (TM5Linux,
+  WizTreeLinux, FastCopyLinux): one `./install.sh` in the repository root for
+  every common distribution, plus `update.sh` and `uninstall.sh`. It detects
+  the distribution from `/etc/os-release`, installs the build dependencies
+  with the package manager after one question, sets up Rust (rustup) and
+  Node.js (nvm, without touching shell profiles) only if the system's are
+  missing or too old, builds as the normal user (refusing to run under
+  `sudo`), checks with `ldd` that every library resolves, and installs to
+  `/usr/local` (or `~/.local` with `--user`). Installed files are staged with
+  `make install DESTDIR=…` and recorded in
+  `<prefix>/lib/toolcheckout/install-manifest.txt` together with a copy of
+  `uninstall.sh`, so uninstalling works even after the folder is deleted and
+  updates remove files a newer version no longer ships. The manifest lives in
+  `lib/`, not `share/toolcheckout`, because `~/.local/share/toolcheckout` is
+  the shop's data folder. On Arch-based systems the script builds a pacman
+  package from `packaging/arch/PKGBUILD` instead (as WizTreeLinux does).
+  `packaging/deb` and `packaging/rpm` wrap Tauri's own bundler, so they make
+  the same package as the release.
+* **Uninstalling never deletes shop data.** The owner's other uninstallers
+  have `--purge`. This one deliberately doesn't, because the database is the
+  shop's loan history and audit trail. It prints where the data is instead.
+* **The Linux command is `toolcheckout`** (lowercase, like the owner's other
+  apps), set by `src-tauri/tauri.linux.conf.json`. Windows keeps
+  `ToolCheckout.exe`. The window class is then `toolcheckout`, which the menu
+  entries name in `StartupWMClass` so desktops match the window to its icon.
+  The `install.sh` menu entry uses the reverse-DNS ID
+  `io.github.oreo1298.ToolCheckout` with AppStream metainfo and the SVG icon.
+  The Tauri identifier (`com.toolcheckout.desktop`) is unchanged, because the
+  Windows installer and WebView data depend on it.
+* **The Linux installer is tested in CI** (`linux-install.yml`) on Ubuntu
+  22.04/24.04, Debian 12/13, Fedora, AlmaLinux 10, Arch, openSUSE
+  Tumbleweed/Leap 16 and Void. On a clean container, as a normal user with
+  sudo, it runs install → update → uninstall → `--user` install → uninstall,
+  and the .deb/.rpm scripts on four of them. After each install it checks the
+  binary, the menu entry's `StartupWMClass` and `ldd`. It runs when the
+  installer, packaging or dependency manifests change, and monthly. This
+  replaced an earlier workflow that ran README command blocks. Those
+  dependency lists (verified on all ten distributions) now live in
+  `install.sh`.
+* **PKGBUILD uses `options=('!lto' '!debug')`** as a precaution: with LTO on,
+  makepkg compiles C code (here the bundled SQLite) into LTO objects, a known
+  source of link failures for Rust packages that build C code.
 * **Minimal Linux build dependencies.** The lockfile has no `openssl-sys` or
   `libxdo-sys`, and the tray library is loaded at runtime, so Tauri's generic
   list (OpenSSL, libxdo, appindicator, librsvg) isn't needed. What is needed:
@@ -89,12 +124,8 @@ at the bottom of each group.
   3 and libsoup 3) and D-Bus (linked by `tao`).
 * **Minimum Rust is 1.90** (`rust-version`), the newest requirement among the
   locked dependencies (Tauri 2.12, muda). Checked by compiling the workspace
-  with Rust 1.90. The README recommends rustup because distribution Rust is
-  often older.
-* **`scripts/install-linux.sh`** installs a `--no-bundle` build for
-  distributions without .deb/.rpm (Arch, Void, Gentoo…): binary, menu entry
-  and icons under `~/.local` (or `/usr/local` with `--system`), mirroring the
-  .deb's file names, with `--uninstall`.
+  with Rust 1.90. `install.sh` uses rustup when the distribution's Rust is
+  older.
 * **Mobile crate types dropped.** The template's `staticlib`/`cdylib` are only
   for iOS/Android and roughly doubled link time and disk use.
 
