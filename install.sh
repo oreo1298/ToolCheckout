@@ -21,7 +21,8 @@ NVM_VERSION="v0.40.3"
 NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PREFIX=""
+# Not called PREFIX: nvm (sourced into this shell) refuses to work when a PREFIX variable is set.
+INSTALL_PREFIX=""
 USER_INSTALL=0
 INSTALL_DEPS=1
 DEPS_ONLY=0
@@ -310,7 +311,7 @@ detect_install() {
         INST_KIND=pacman; INST_PREFIX=/usr; return
     fi
     local p
-    for p in ${PREFIX:+"$PREFIX"} /usr/local "$HOME/.local" /usr /opt/toolcheckout; do
+    for p in ${INSTALL_PREFIX:+"$INSTALL_PREFIX"} /usr/local "$HOME/.local" /usr /opt/toolcheckout; do
         if [[ -f "$p/lib/toolcheckout/install-manifest.txt" ]]; then
             INST_KIND=make; INST_PREFIX="$p"; return
         fi
@@ -345,20 +346,20 @@ install_with_make() {
 $missing"
     ok "All $(ldd "$built" | wc -l) libraries it needs are installed."
 
-    step "Installing to $PREFIX"
+    step "Installing to $INSTALL_PREFIX"
     local stage manifest_tmp count=0 rel old mode
     STAGE="$(mktemp -d)"
     trap 'rm -rf "$STAGE" "$STAGE.manifest"' EXIT
     stage="$STAGE"
-    make -C "$SRC_DIR" install PREFIX="$PREFIX" DESTDIR="$stage" BIN_SRC="$built" >/dev/null
+    make -C "$SRC_DIR" install PREFIX="$INSTALL_PREFIX" DESTDIR="$stage" BIN_SRC="$built" >/dev/null
     chmod -R u+rwX,go+rX "$stage"
 
-    local manifest="$PREFIX/lib/toolcheckout/install-manifest.txt"
+    local manifest="$INSTALL_PREFIX/lib/toolcheckout/install-manifest.txt"
     if [[ -f "$manifest" ]]; then
         # Remove files of the previous version that no longer exist.
         while IFS= read -r old; do
             [[ -z "$old" || "$old" == \#* || -e "$stage$old" ]] && continue
-            [[ "$old" == "$PREFIX"/* ]] || continue
+            [[ "$old" == "$INSTALL_PREFIX"/* ]] || continue
             if [[ -e "$old" || -L "$old" ]]; then inst rm -f -- "$old"; fi
         done <"$manifest"
     fi
@@ -369,7 +370,7 @@ $missing"
         local ver gv
         ver="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' "$SRC_DIR/src-tauri/tauri.conf.json" | head -n1)"
         gv="$(git_version || true)"
-        echo "# version: ${ver}${gv:+ (git $gv)} installed: $(date '+%Y-%m-%d %H:%M:%S') prefix: $PREFIX"
+        echo "# version: ${ver}${gv:+ (git $gv)} installed: $(date '+%Y-%m-%d %H:%M:%S') prefix: $INSTALL_PREFIX"
         (cd "$stage" && find . -type f | sed 's|^\.||' | sort)
         echo "$manifest"
     } >"$manifest_tmp"
@@ -384,11 +385,11 @@ $missing"
 
     # Refresh menus and icons. Only an icon cache that already exists is updated: creating one in a
     # folder that never had one (e.g. ~/.local) would hide icons other programs add later.
-    if have gtk-update-icon-cache && [[ -f "$PREFIX/share/icons/hicolor/icon-theme.cache" ]]; then
-        inst gtk-update-icon-cache -q -t -f "$PREFIX/share/icons/hicolor" >/dev/null 2>&1 || true
+    if have gtk-update-icon-cache && [[ -f "$INSTALL_PREFIX/share/icons/hicolor/icon-theme.cache" ]]; then
+        inst gtk-update-icon-cache -q -t -f "$INSTALL_PREFIX/share/icons/hicolor" >/dev/null 2>&1 || true
     fi
     if have update-desktop-database; then
-        inst update-desktop-database -q "$PREFIX/share/applications" >/dev/null 2>&1 || true
+        inst update-desktop-database -q "$INSTALL_PREFIX/share/applications" >/dev/null 2>&1 || true
     fi
 }
 
@@ -396,20 +397,20 @@ $missing"
 
 do_install() {
     detect_distro
-    if [[ -n "$PREFIX" ]]; then
-        [[ "$PREFIX" == /* ]] || fail "--prefix must be an absolute path"
-        PREFIX="${PREFIX%/}"
+    if [[ -n "$INSTALL_PREFIX" ]]; then
+        [[ "$INSTALL_PREFIX" == /* ]] || fail "--prefix must be an absolute path"
+        INSTALL_PREFIX="${INSTALL_PREFIX%/}"
     elif [[ $USER_INSTALL -eq 1 ]]; then
-        PREFIX="$HOME/.local"
+        INSTALL_PREFIX="$HOME/.local"
     else
-        PREFIX=/usr/local
+        INSTALL_PREFIX=/usr/local
     fi
-    if [[ $EUID -ne 0 ]] && { [[ "$PREFIX" == "$HOME"/* ]] || [[ -d "$PREFIX" && -w "$PREFIX" ]]; }; then
+    if [[ $EUID -ne 0 ]] && { [[ "$INSTALL_PREFIX" == "$HOME"/* ]] || [[ -d "$INSTALL_PREFIX" && -w "$INSTALL_PREFIX" ]]; }; then
         INSTALL_AS_USER=1
     fi
 
     if [[ "$USE_PKG" == auto ]]; then
-        if [[ "$FAMILY" == arch && $USER_INSTALL -eq 0 && "$PREFIX" == /usr/local && $EUID -ne 0 && $DEPS_ONLY -eq 0 ]]; then
+        if [[ "$FAMILY" == arch && $USER_INSTALL -eq 0 && "$INSTALL_PREFIX" == /usr/local && $EUID -ne 0 && $DEPS_ONLY -eq 0 ]]; then
             USE_PKG=1
         else
             USE_PKG=0
@@ -437,7 +438,7 @@ do_install() {
     elif [[ $USE_PKG -eq 1 ]]; then
         ok "Install method: a pacman package built from packaging/arch/PKGBUILD"
     else
-        ok "Install location: $PREFIX"
+        ok "Install location: $INSTALL_PREFIX"
     fi
     detect_install
     if [[ $DEPS_ONLY -eq 0 ]]; then
@@ -446,7 +447,7 @@ do_install() {
             warn "remove the package first with: sudo pacman -R $PKG_NAME"
         elif [[ $INST_KIND == make && $USE_PKG -eq 1 ]]; then
             warn "An earlier installation exists in $INST_PREFIX. Remove it with ./uninstall.sh --prefix $INST_PREFIX"
-        elif [[ $INST_KIND == make && "$INST_PREFIX" == "$PREFIX" ]]; then
+        elif [[ $INST_KIND == make && "$INST_PREFIX" == "$INSTALL_PREFIX" ]]; then
             info "An existing installation was found - it will be updated."
         fi
         if { have dpkg && dpkg -s "$DISTRO_PKG" >/dev/null 2>&1; } || { have rpm && rpm -q "$DISTRO_PKG" >/dev/null 2>&1; }; then
@@ -515,11 +516,11 @@ do_install() {
     else
         local sudo_hint=""
         [[ $INSTALL_AS_USER -eq 0 && $EUID -ne 0 ]] && sudo_hint="sudo "
-        info "Uninstall:      ${B}./uninstall.sh${R}   or   ${B}${sudo_hint}$PREFIX/lib/toolcheckout/uninstall.sh${R}"
+        info "Uninstall:      ${B}./uninstall.sh${R}   or   ${B}${sudo_hint}$INSTALL_PREFIX/lib/toolcheckout/uninstall.sh${R}"
         case ":$PATH:" in
-            *":$PREFIX/bin:"*) ;;
-            *) warn "$PREFIX/bin is not in your PATH - the menu entry works, but to start it from a"
-               warn "terminal, add that folder to your PATH or run $PREFIX/bin/toolcheckout" ;;
+            *":$INSTALL_PREFIX/bin:"*) ;;
+            *) warn "$INSTALL_PREFIX/bin is not in your PATH - the menu entry works, but to start it from a"
+               warn "terminal, add that folder to your PATH or run $INSTALL_PREFIX/bin/toolcheckout" ;;
         esac
     fi
     info "Your shop data is kept in ~/.local/share/toolcheckout (or the folder chosen in Settings);"
@@ -556,7 +557,7 @@ do_update() {
             [[ "$INST_PREFIX" == "$HOME"/* ]] && args+=(--user) ;;
         none)
             warn "ToolCheckout does not seem to be installed yet - installing it now."
-            [[ -n "$PREFIX" ]] && args+=(--prefix "$PREFIX")
+            [[ -n "$INSTALL_PREFIX" ]] && args+=(--prefix "$INSTALL_PREFIX")
             [[ $USER_INSTALL -eq 1 ]] && args+=(--user) ;;
     esac
     [[ $INSTALL_DEPS -eq 0 ]] && args+=(--no-deps)
@@ -571,8 +572,8 @@ main() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --user)        USER_INSTALL=1 ;;
-            --prefix)      [[ $# -ge 2 ]] || fail "--prefix needs a directory"; PREFIX="$2"; shift ;;
-            --prefix=*)    PREFIX="${1#*=}" ;;
+            --prefix)      [[ $# -ge 2 ]] || fail "--prefix needs a directory"; INSTALL_PREFIX="$2"; shift ;;
+            --prefix=*)    INSTALL_PREFIX="${1#*=}" ;;
             --update|update)       MODE=update ;;
             --uninstall|uninstall) MODE=uninstall ;;
             --no-deps)     INSTALL_DEPS=0 ;;
@@ -588,7 +589,7 @@ main() {
     case "$MODE" in
         uninstall)
             local args=()
-            [[ -n "$PREFIX" ]] && args+=(--prefix "$PREFIX")
+            [[ -n "$INSTALL_PREFIX" ]] && args+=(--prefix "$INSTALL_PREFIX")
             [[ $ASSUME_YES -eq 1 ]] && args+=(--yes)
             exec "$SRC_DIR/uninstall.sh" "${args[@]}" ;;
         update) do_update ;;
